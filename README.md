@@ -1,18 +1,14 @@
-# eClinic Chat v0.2
+# eClinic Chat v0.3
 
-Prototip vizual pentru:
-- ecran de autentificare cu utilizator, parolă și cheie de securitate;
-- listă de conversații;
-- trimitere locală de mesaje;
-- selectare locală de imagini, PDF și fișiere DICOM.
+Autentificare reală prin Supabase:
+- creare cont;
+- conectare email/parolă;
+- sesiune persistentă după refresh;
+- deconectare reală.
 
-## Important
+Necesită în Vercel:
+- NEXT_PUBLIC_SUPABASE_URL
+- NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-Această versiune este doar un prototip de interfață.
-Nu are autentificare reală, bază de date, criptare end-to-end sau stocare securizată.
+Mesajele sunt încă locale și demonstrative.
 Nu introduceți date medicale reale.
-
-## Publicare
-
-Înlocuiți fișierele existente din repository cu fișierele acestei versiuni.
-Vercel va porni automat un deployment nou.
