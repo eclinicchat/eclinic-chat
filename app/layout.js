@@ -1,6 +1,8 @@
+import "./globals.css";
+
 export const metadata = {
   title: "eClinic Chat",
-  description: "Radiology chat application",
+  description: "Prototip de chat securizat pentru echipe medicale",
 };
 
 export default function RootLayout({ children }) {

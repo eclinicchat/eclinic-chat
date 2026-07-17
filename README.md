@@ -1,10 +1,18 @@
-# eClinic Chat
+# eClinic Chat v0.2
 
-Aplicație web simplă pentru chat radiologic.
+Prototip vizual pentru:
+- ecran de autentificare cu utilizator, parolă și cheie de securitate;
+- listă de conversații;
+- trimitere locală de mesaje;
+- selectare locală de imagini, PDF și fișiere DICOM.
 
-## Publicare pe Vercel
+## Important
 
-1. Încarcă toate fișierele din acest proiect în repository-ul GitHub.
-2. Importă repository-ul în Vercel.
-3. Vercel va detecta automat Next.js.
-4. Apasă Deploy.
+Această versiune este doar un prototip de interfață.
+Nu are autentificare reală, bază de date, criptare end-to-end sau stocare securizată.
+Nu introduceți date medicale reale.
+
+## Publicare
+
+Înlocuiți fișierele existente din repository cu fișierele acestei versiuni.
+Vercel va porni automat un deployment nou.
