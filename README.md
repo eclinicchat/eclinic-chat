@@ -1,6 +1,6 @@
-# eClinic Chat v0.5
+# eClinic Chat v0.6
 
-MVP cu autentificare Supabase și conversații private vizibile numai membrilor.
+MVP cu autentificare Supabase și conversații private vizibile numai membrilor. Include delogare manuală vizibilă pe desktop și mobil și delogare automată după 15 minute de inactivitate.
 
 1. Rulează integral `supabase-private-chat.sql` în Supabase SQL Editor.
 2. În Vercel păstrează `NEXT_PUBLIC_SUPABASE_URL` și `NEXT_PUBLIC_SUPABASE_ANON_KEY`.

@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 
 const time = (value) => new Date(value).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" });
+const INACTIVITY_MS = 15 * 60 * 1000;
+const WARNING_MS = 60 * 1000;
 
 function Login() {
   const [signup, setSignup] = useState(false);
@@ -86,8 +88,50 @@ function Chat({ session }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [modal, setModal] = useState(false);
+  const [logoutWarning, setLogoutWarning] = useState(false);
+  const [logoutCountdown, setLogoutCountdown] = useState(60);
   const bottom = useRef(null);
+  const inactivityTimer = useRef(null);
+  const warningTimer = useRef(null);
+  const countdownTimer = useRef(null);
   const room = rooms.find((x) => x.id === roomId);
+
+  async function signOut() {
+    clearTimeout(inactivityTimer.current);
+    clearTimeout(warningTimer.current);
+    clearInterval(countdownTimer.current);
+    await supabase.auth.signOut();
+  }
+
+  useEffect(() => {
+    function resetInactivity() {
+      clearTimeout(inactivityTimer.current);
+      clearTimeout(warningTimer.current);
+      clearInterval(countdownTimer.current);
+      setLogoutWarning(false);
+      setLogoutCountdown(60);
+
+      warningTimer.current = setTimeout(() => {
+        setLogoutWarning(true);
+        const deadline = Date.now() + WARNING_MS;
+        countdownTimer.current = setInterval(() => {
+          setLogoutCountdown(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
+        }, 1000);
+      }, INACTIVITY_MS - WARNING_MS);
+
+      inactivityTimer.current = setTimeout(signOut, INACTIVITY_MS);
+    }
+
+    const events = ["pointerdown", "keydown", "scroll", "touchstart"];
+    events.forEach((event) => window.addEventListener(event, resetInactivity, { passive: true }));
+    resetInactivity();
+    return () => {
+      events.forEach((event) => window.removeEventListener(event, resetInactivity));
+      clearTimeout(inactivityTimer.current);
+      clearTimeout(warningTimer.current);
+      clearInterval(countdownTimer.current);
+    };
+  }, []);
 
   async function loadRooms(preferredId) {
     const { data, error: loadError } = await supabase.from("my_conversations").select("*").order("updated_at", { ascending: false });
@@ -138,7 +182,7 @@ function Chat({ session }) {
 
   return <main className="app">
     <aside className="side">
-      <div className="brandRow"><div><p className="eyebrow">eClinic</p><h2>Chat</h2></div><button onClick={() => supabase.auth.signOut()}>Ieșire</button></div>
+      <div className="brandRow"><div><p className="eyebrow">eClinic</p><h2>Chat</h2></div><button className="logoutBtn" onClick={signOut} title="Ieșire din cont"><span className="logoutText">Ieșire</span><span className="logoutIcon" aria-hidden="true">↪</span></button></div>
       <button className="primary newBtn" onClick={() => setModal(true)}>+ Conversație nouă</button>
       <div className="conversationList">
         {loading && <p className="status">Se încarcă...</p>}
@@ -166,6 +210,11 @@ function Chat({ session }) {
           <button className="primary" onClick={() => setModal(true)}>Creează prima conversație</button>{error && <p className="chatError">{error}</p>}</div>}
     </section>
     {modal && <NewConversation close={() => setModal(false)} created={(id) => { setModal(false); loadRooms(id); }} />}
+    {logoutWarning && <div className="modalBackdrop"><section className="modal timeoutModal">
+      <p className="eyebrow">Sesiune inactivă</p><h2>Vei fi delogat în {logoutCountdown} secunde</h2>
+      <p className="muted">Pentru protejarea contului, sesiunea se închide automat după 15 minute fără activitate.</p>
+      <div className="modalActions"><button onClick={signOut}>Ieșire acum</button><button className="primary" onClick={() => window.dispatchEvent(new Event("pointerdown"))}>Rămân conectat</button></div>
+    </section></div>}
   </main>;
 }
 
