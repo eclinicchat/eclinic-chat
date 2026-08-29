@@ -158,7 +158,7 @@ function Chat({ session }) {
     else {
       const list = data || [];
       setRooms(list);
-      setRoomId((current) => preferredId && list.some((x) => x.id === preferredId) ? preferredId : list.some((x) => x.id === current) ? current : list[0]?.id || null);
+      setRoomId((current) => preferredId && list.some((x) => x.id === preferredId) ? preferredId : list.some((x) => x.id === current) ? current : null);
     }
     setLoading(false);
   }
@@ -431,8 +431,8 @@ function Chat({ session }) {
           <button className="primary" disabled={sending || (!draft.trim() && !attachment)}>{sending ? "Se trimite..." : "Trimite"}</button>
           {attachment && <div className="selectedFile"><span>{attachment.name}</span><button type="button" onClick={() => { setAttachment(null); if (fileInput.current) fileInput.current.value = ""; }}>×</button></div>}
         </form></div></> :
-        <div className="welcome"><div className="logo">eC</div><h2>Conversații private</h2><p>Creează o conversație și adaugă colegii care au deja cont.</p>
-          <button className="primary" onClick={() => setModal(true)}>Creează prima conversație</button>{error && <p className="chatError">{error}</p>}</div>}
+        <div className="welcome"><div className="logo">eC</div><h2>Conversații private</h2><p>{rooms.length ? "Selectează o conversație din listă pentru a o deschide." : "Creează o conversație și adaugă colegii care au deja cont."}</p>
+          {!rooms.length && <button className="primary" onClick={() => setModal(true)}>Creează prima conversație</button>}{error && <p className="chatError">{error}</p>}</div>}
     </section>
     {modal && <NewConversation close={() => setModal(false)} created={(id) => { setModal(false); loadRooms(id); }} />}
     {settingsOpen && room && <div className="modalBackdrop" onMouseDown={() => !settingsBusy && setSettingsOpen(false)}><section className="modal manageModal" onMouseDown={(e) => e.stopPropagation()}>

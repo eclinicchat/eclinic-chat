@@ -1,4 +1,4 @@
-# eClinic Chat v0.8
+# eClinic Chat v0.8.1
 
 MVP cu autentificare Supabase, conversații private și trimitere de imagini de maximum 10 MB, vizibile numai membrilor. Include delogare manuală și automată după 15 minute de inactivitate, administratori multipli și parolă suplimentară opțională pentru fiecare grup.
 
@@ -10,6 +10,8 @@ MVP cu autentificare Supabase, conversații private și trimitere de imagini de 
 Creatorul este proprietarul conversației și poate acorda sau retrage rolul de administrator. Administratorii pot redenumi grupul și gestiona membrii; numai proprietarul poate modifica administratorii, parola grupului și poate șterge conversația. Ceilalți membri pot părăsi conversația.
 
 Parola suplimentară este cerută la fiecare redeschidere a grupului, este stocată numai ca hash și se blochează timp de 5 minute după 5 încercări greșite. Aceasta este o protecție suplimentară a interfeței, nu criptare end-to-end.
+
+La conectarea în aplicație nu se deschide automat niciun grup. Parola suplimentară este solicitată numai după ce utilizatorul apasă pe conversația protejată.
 
 Un utilizator trebuie să aibă deja cont înainte să fie adăugat după email.
 
