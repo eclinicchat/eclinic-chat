@@ -6,6 +6,8 @@ import { supabase } from "../lib/supabase";
 const time = (value) => new Date(value).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" });
 const INACTIVITY_MS = 15 * 60 * 1000;
 const WARNING_MS = 60 * 1000;
+const QUICK_EMOJIS = ["😀", "😂", "😍", "👍", "❤️", "🙏", "🎉", "✅"];
+const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
 function Login() {
   const [signup, setSignup] = useState(false);
@@ -84,7 +86,11 @@ function Chat({ session }) {
   const [roomId, setRoomId] = useState(null);
   const [unlockedRoomId, setUnlockedRoomId] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [reactions, setReactions] = useState([]);
   const [draft, setDraft] = useState("");
+  const [replyTo, setReplyTo] = useState(null);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [reactionTarget, setReactionTarget] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [attachment, setAttachment] = useState(null);
@@ -106,6 +112,7 @@ function Chat({ session }) {
   const [logoutWarning, setLogoutWarning] = useState(false);
   const [logoutCountdown, setLogoutCountdown] = useState(60);
   const bottom = useRef(null);
+  const messageRefs = useRef({});
   const fileInput = useRef(null);
   const inactivityTimer = useRef(null);
   const warningTimer = useRef(null);
@@ -114,6 +121,7 @@ function Chat({ session }) {
   const currentMembership = members.find((x) => x.user_id === session.user.id);
   const isOwner = room?.created_by === session.user.id;
   const isAdmin = Boolean(isOwner || currentMembership?.is_admin);
+  const pinnedMessages = messages.filter((x) => x.pinned_at).sort((a, b) => new Date(b.pinned_at) - new Date(a.pinned_at));
 
   async function signOut() {
     clearTimeout(inactivityTimer.current);
@@ -153,7 +161,7 @@ function Chat({ session }) {
   }, []);
 
   async function loadRooms(preferredId) {
-    const { data, error: loadError } = await supabase.from("my_conversations").select("*").order("updated_at", { ascending: false });
+    const { data, error: loadError } = await supabase.from("my_conversations").select("*").order("is_pinned", { ascending: false }).order("updated_at", { ascending: false });
     if (loadError) setError("Conversațiile nu au putut fi încărcate. Rulează scriptul SQL v0.5.");
     else {
       const list = data || [];
@@ -179,19 +187,33 @@ function Chat({ session }) {
     return () => { active = false; };
   }, [roomId, unlockedRoomId]);
   useEffect(() => {
-    if (!roomId || unlockedRoomId !== roomId) { setMessages([]); return; }
+    if (!roomId || unlockedRoomId !== roomId) { setMessages([]); setReactions([]); return; }
     let active = true;
     setMessages([]);
+    setReactions([]);
     setError("");
-    supabase.from("private_messages").select("*").eq("conversation_id", roomId).order("created_at").limit(500)
-      .then(({ data, error: loadError }) => {
+    Promise.all([
+      supabase.from("private_messages").select("*").eq("conversation_id", roomId).order("created_at").limit(500),
+      supabase.from("message_reactions").select("*").eq("conversation_id", roomId),
+    ]).then(([messageResult, reactionResult]) => {
         if (!active) return;
-        if (loadError) setError("Mesajele nu au putut fi încărcate.");
-        else setMessages(data || []);
+        if (messageResult.error) setError("Mesajele nu au putut fi încărcate.");
+        else setMessages(messageResult.data || []);
+        if (!reactionResult.error) setReactions(reactionResult.data || []);
+        supabase.rpc("mark_conversation_read", { target_conversation_id: roomId }).then(() => loadRooms(roomId));
       });
     const channel = supabase.channel(`private:${roomId}`).on("postgres_changes", {
       event: "INSERT", schema: "public", table: "private_messages", filter: `conversation_id=eq.${roomId}`,
-    }, ({ new: item }) => setMessages((current) => current.some((x) => x.id === item.id) ? current : [...current, item])).subscribe();
+    }, ({ new: item }) => {
+      setMessages((current) => current.some((x) => x.id === item.id) ? current : [...current, item]);
+      supabase.rpc("mark_conversation_read", { target_conversation_id: roomId }).then(() => loadRooms(roomId));
+    }).on("postgres_changes", {
+      event: "UPDATE", schema: "public", table: "private_messages", filter: `conversation_id=eq.${roomId}`,
+    }, ({ new: item }) => setMessages((current) => current.map((x) => x.id === item.id ? item : x)))
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "message_reactions", filter: `conversation_id=eq.${roomId}`,
+      }, () => supabase.from("message_reactions").select("*").eq("conversation_id", roomId).then(({ data }) => active && setReactions(data || [])))
+      .subscribe();
     return () => { active = false; supabase.removeChannel(channel); };
   }, [roomId, unlockedRoomId]);
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
@@ -234,7 +256,8 @@ function Chat({ session }) {
       attachmentData = { attachment_path: uploadedPath, attachment_name: attachment.name, attachment_type: attachment.type, attachment_size: attachment.size };
     }
     const { data, error: sendError } = await supabase.from("private_messages").insert({
-      conversation_id: roomId, user_id: session.user.id, sender_email: session.user.email, body: body || null, ...attachmentData,
+      conversation_id: roomId, user_id: session.user.id, sender_email: session.user.email, body: body || null,
+      reply_to_id: replyTo?.id || null, ...attachmentData,
     }).select().single();
     if (sendError) {
       if (uploadedPath) await supabase.storage.from("chat-images").remove([uploadedPath]);
@@ -242,12 +265,51 @@ function Chat({ session }) {
     }
     else {
       setDraft("");
+      setReplyTo(null);
+      setEmojiOpen(false);
       setAttachment(null);
       if (fileInput.current) fileInput.current.value = "";
       setMessages((current) => current.some((x) => x.id === data.id) ? current : [...current, data]);
       loadRooms(roomId);
     }
     setSending(false);
+  }
+
+  function insertEmoji(emoji) {
+    setDraft((current) => `${current}${emoji}`);
+  }
+
+  function groupedReactions(messageId) {
+    const groups = {};
+    for (const reaction of reactions.filter((x) => x.message_id === messageId)) {
+      if (!groups[reaction.emoji]) groups[reaction.emoji] = { count: 0, mine: false };
+      groups[reaction.emoji].count += 1;
+      if (reaction.user_id === session.user.id) groups[reaction.emoji].mine = true;
+    }
+    return groups;
+  }
+
+  async function reactToMessage(messageId, emoji) {
+    setReactionTarget(null);
+    const { error: reactionError } = await supabase.rpc("set_message_reaction", {
+      target_message_id: messageId, reaction_emoji: emoji,
+    });
+    if (reactionError) setError(reactionError.message);
+  }
+
+  async function toggleMessagePin(messageId) {
+    const { error: pinError } = await supabase.rpc("toggle_message_pin", { target_message_id: messageId });
+    if (pinError) setError(pinError.message);
+  }
+
+  async function toggleGroupPin() {
+    const { error: pinError } = await supabase.rpc("toggle_conversation_pin", { target_conversation_id: roomId });
+    if (pinError) setError(pinError.message);
+    else await loadRooms(roomId);
+  }
+
+  function scrollToMessage(messageId) {
+    messageRefs.current[messageId]?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   async function loadMembers() {
@@ -407,28 +469,44 @@ function Chat({ session }) {
         {loading && <p className="status">Se încarcă...</p>}
         {!loading && rooms.length === 0 && <p className="emptySide">Nu ai încă nicio conversație.</p>}
         {rooms.map((item) => <button className={`conv ${item.id === roomId ? "active" : ""}`} key={item.id} onClick={() => setRoomId(item.id)}>
-          <span>{item.title.slice(0, 2).toUpperCase()}</span><div><strong>{item.title}</strong><small>{item.member_count} membri · privat</small></div>
+          <span>{item.title.slice(0, 2).toUpperCase()}</span><div><strong>{item.is_pinned && "📌 "}{item.title}</strong><small>{item.member_count} membri · privat</small></div>
+          {!item.password_protected && item.unread_count > 0 && <i className="unreadBadge">{item.unread_count > 99 ? "99+" : item.unread_count}</i>}
         </button>)}
       </div>
       <div className="user"><strong>{session.user.email}</strong><small>Conectat</small></div>
     </aside>
     <section className="chat">
-      {room ? <><header><div><strong>{room.title}</strong><small>{room.member_count} membri · numai membrii au acces</small></div><div className="headerActions"><b>● Privat</b><button onClick={openSettings}>Gestionează</button></div></header>
+      {room ? <><header><div><strong>{room.title}</strong><small>{room.member_count} membri · numai membrii au acces</small></div><div className="headerActions"><b>● Privat</b><button onClick={toggleGroupPin}>{room.is_pinned ? "📌 Fixat" : "Fixează sus"}</button><button onClick={openSettings}>Gestionează</button></div></header>
         <div className="warning">Versiune de test. Nu introduce date medicale sau personale reale.</div>
         <div className="msgs">
+          {pinnedMessages.length > 0 && <button className="pinnedBanner" onClick={() => scrollToMessage(pinnedMessages[0].id)}>📌 {pinnedMessages.length} {pinnedMessages.length === 1 ? "mesaj fixat" : "mesaje fixate"} · {pinnedMessages[0].body || pinnedMessages[0].attachment_name || "Imagine"}</button>}
           {messages.length === 0 && !error && <p className="status">Trimite primul mesaj.</p>}
-          {messages.map((item) => { const mine = item.user_id === session.user.id; return <div key={item.id} className={`bubble ${mine ? "mine" : ""}`}>
-            {!mine && <strong className="sender">{item.sender_email || "Utilizator"}</strong>}
-            {item.attachment_path && imageUrls[item.attachment_path] && <a href={imageUrls[item.attachment_path]} target="_blank" rel="noreferrer"><img className="chatImage" src={imageUrls[item.attachment_path]} alt={item.attachment_name || "Imagine atașată"} /></a>}
-            {item.attachment_path && !imageUrls[item.attachment_path] && <p className="imageLoading">Se încarcă imaginea...</p>}
-            {item.body && <p>{item.body}</p>}<small>{time(item.created_at)}</small>
+          {messages.map((item) => { const mine = item.user_id === session.user.id; const replied = messages.find((x) => x.id === item.reply_to_id); const itemReactions = groupedReactions(item.id); return <div ref={(node) => { messageRefs.current[item.id] = node; }} key={item.id} className={`messageWrap ${mine ? "mine" : ""}`}>
+            <div className={`bubble ${mine ? "mine" : ""} ${item.attachment_path ? "hasImage" : ""} ${item.pinned_at ? "pinnedMessage" : ""}`}>
+              {!mine && <strong className="sender">{item.sender_email || "Utilizator"}</strong>}
+              {item.pinned_at && <span className="pinMark">📌</span>}
+              {item.reply_to_id && <button className="replyQuote" onClick={() => scrollToMessage(item.reply_to_id)}>
+                <strong>{replied?.sender_email || "Mesaj anterior"}</strong><span>{replied?.body || (replied?.attachment_path ? "📷 Imagine" : "Mesaj indisponibil")}</span>
+                {replied?.attachment_path && imageUrls[replied.attachment_path] && <img src={imageUrls[replied.attachment_path]} alt="Imagine citată" />}
+              </button>}
+              {item.attachment_path && imageUrls[item.attachment_path] && <a href={imageUrls[item.attachment_path]} target="_blank" rel="noreferrer"><img className="chatImage" src={imageUrls[item.attachment_path]} alt={item.attachment_name || "Imagine atașată"} /></a>}
+              {item.attachment_path && !imageUrls[item.attachment_path] && <p className="imageLoading">Se încarcă imaginea...</p>}
+              {item.body && <p>{item.body}</p>}<small>{time(item.created_at)}</small>
+            </div>
+            <div className="messageActions"><button onClick={() => setReplyTo(item)}>↩ Răspunde</button><button onClick={() => setReactionTarget(reactionTarget === item.id ? null : item.id)}>☺</button>
+              {room.my_is_admin && <button onClick={() => toggleMessagePin(item.id)}>{item.pinned_at ? "Anulează pin" : "📌 Pin"}</button>}</div>
+            {reactionTarget === item.id && <div className="reactionPicker">{REACTION_EMOJIS.map((emoji) => <button key={emoji} onClick={() => reactToMessage(item.id, emoji)}>{emoji}</button>)}</div>}
+            {Object.keys(itemReactions).length > 0 && <div className="reactionSummary">{Object.entries(itemReactions).map(([emoji, info]) => <button className={info.mine ? "mine" : ""} key={emoji} onClick={() => reactToMessage(item.id, emoji)}>{emoji} {info.count}</button>)}</div>}
           </div>; })}<div ref={bottom} />
         </div>
         <div>{error && <p className="chatError">{error}</p>}<form className="composer" onSubmit={send}>
+          {replyTo && <div className="selectedReply"><div><strong>Răspuns către {replyTo.sender_email || "mesaj"}</strong><span>{replyTo.body || (replyTo.attachment_path ? "📷 Imagine" : "Mesaj")}</span></div>{replyTo.attachment_path && imageUrls[replyTo.attachment_path] && <img src={imageUrls[replyTo.attachment_path]} alt="Imagine selectată pentru răspuns" />}<button type="button" onClick={() => setReplyTo(null)}>×</button></div>}
           <input ref={fileInput} className="fileInput" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" onChange={chooseFile} />
           <button className="attachBtn" type="button" onClick={() => fileInput.current?.click()} disabled={sending} title="Atașează imagine" aria-label="Atașează imagine">📎</button>
+          <button className="emojiBtn" type="button" onClick={() => setEmojiOpen(!emojiOpen)} disabled={sending} title="Emoticoane" aria-label="Emoticoane">☺</button>
           <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Scrie un mesaj..." maxLength={4000} disabled={sending} />
           <button className="primary" disabled={sending || (!draft.trim() && !attachment)}>{sending ? "Se trimite..." : "Trimite"}</button>
+          {emojiOpen && <div className="emojiPicker">{QUICK_EMOJIS.map((emoji) => <button type="button" key={emoji} onClick={() => insertEmoji(emoji)}>{emoji}</button>)}</div>}
           {attachment && <div className="selectedFile"><span>{attachment.name}</span><button type="button" onClick={() => { setAttachment(null); if (fileInput.current) fileInput.current.value = ""; }}>×</button></div>}
         </form></div></> :
         <div className="welcome"><div className="logo">eC</div><h2>Conversații private</h2><p>{rooms.length ? "Selectează o conversație din listă pentru a o deschide." : "Creează o conversație și adaugă colegii care au deja cont."}</p>
