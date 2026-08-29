@@ -82,6 +82,7 @@ function NewConversation({ close, created }) {
 function Chat({ session }) {
   const [rooms, setRooms] = useState([]);
   const [roomId, setRoomId] = useState(null);
+  const [unlockedRoomId, setUnlockedRoomId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
@@ -90,6 +91,18 @@ function Chat({ session }) {
   const [imageUrls, setImageUrls] = useState({});
   const [error, setError] = useState("");
   const [modal, setModal] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [members, setMembers] = useState([]);
+  const [settingsTitle, setSettingsTitle] = useState("");
+  const [newMemberEmails, setNewMemberEmails] = useState("");
+  const [settingsBusy, setSettingsBusy] = useState(false);
+  const [settingsError, setSettingsError] = useState("");
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [roomPassword, setRoomPassword] = useState("");
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [groupPassword, setGroupPassword] = useState("");
+  const [passwordProtected, setPasswordProtected] = useState(false);
   const [logoutWarning, setLogoutWarning] = useState(false);
   const [logoutCountdown, setLogoutCountdown] = useState(60);
   const bottom = useRef(null);
@@ -98,6 +111,9 @@ function Chat({ session }) {
   const warningTimer = useRef(null);
   const countdownTimer = useRef(null);
   const room = rooms.find((x) => x.id === roomId);
+  const currentMembership = members.find((x) => x.user_id === session.user.id);
+  const isOwner = room?.created_by === session.user.id;
+  const isAdmin = Boolean(isOwner || currentMembership?.is_admin);
 
   async function signOut() {
     clearTimeout(inactivityTimer.current);
@@ -149,7 +165,21 @@ function Chat({ session }) {
 
   useEffect(() => { loadRooms(); }, []);
   useEffect(() => {
-    if (!roomId) { setMessages([]); return; }
+    if (!roomId) { setMessages([]); setUnlockedRoomId(null); return; }
+    if (unlockedRoomId === roomId) return;
+    let active = true;
+    setMessages([]); setPasswordError(""); setRoomPassword("");
+    supabase.rpc("conversation_requires_password", { target_conversation_id: roomId })
+      .then(({ data, error: passwordCheckError }) => {
+        if (!active) return;
+        if (passwordCheckError) setError(passwordCheckError.message);
+        else if (data) setPasswordOpen(true);
+        else setUnlockedRoomId(roomId);
+      });
+    return () => { active = false; };
+  }, [roomId, unlockedRoomId]);
+  useEffect(() => {
+    if (!roomId || unlockedRoomId !== roomId) { setMessages([]); return; }
     let active = true;
     setMessages([]);
     setError("");
@@ -163,7 +193,7 @@ function Chat({ session }) {
       event: "INSERT", schema: "public", table: "private_messages", filter: `conversation_id=eq.${roomId}`,
     }, ({ new: item }) => setMessages((current) => current.some((x) => x.id === item.id) ? current : [...current, item])).subscribe();
     return () => { active = false; supabase.removeChannel(channel); };
-  }, [roomId]);
+  }, [roomId, unlockedRoomId]);
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   useEffect(() => {
@@ -220,6 +250,155 @@ function Chat({ session }) {
     setSending(false);
   }
 
+  async function loadMembers() {
+    if (!roomId) return;
+    setSettingsError("");
+    const { data, error: memberError } = await supabase.rpc("get_conversation_members", {
+      target_conversation_id: roomId,
+    });
+    if (memberError) setSettingsError(memberError.message);
+    else setMembers(data || []);
+  }
+
+  async function openSettings() {
+    setSettingsOpen(true);
+    setSettingsTitle(room?.title || "");
+    setNewMemberEmails("");
+    setGroupPassword("");
+    setMembers([]);
+    const [, passwordResult] = await Promise.all([
+      loadMembers(),
+      supabase.rpc("conversation_requires_password", { target_conversation_id: roomId }),
+    ]);
+    if (passwordResult.error) setSettingsError(passwordResult.error.message);
+    else setPasswordProtected(Boolean(passwordResult.data));
+  }
+
+  async function unlockConversation(e) {
+    e.preventDefault();
+    if (!roomPassword || passwordBusy) return;
+    setPasswordBusy(true); setPasswordError("");
+    const { data, error: verifyError } = await supabase.rpc("verify_conversation_password", {
+      target_conversation_id: roomId, supplied_password: roomPassword,
+    });
+    if (verifyError) setPasswordError(verifyError.message);
+    else if (!data) setPasswordError("Parola grupului este greșită.");
+    else {
+      setUnlockedRoomId(roomId); setPasswordOpen(false); setRoomPassword("");
+    }
+    setPasswordBusy(false);
+  }
+
+  function cancelPassword() {
+    if (passwordBusy) return;
+    setPasswordOpen(false); setRoomPassword(""); setPasswordError(""); setRoomId(null);
+  }
+
+  async function renameConversation(e) {
+    e.preventDefault();
+    if (!settingsTitle.trim() || settingsBusy) return;
+    setSettingsBusy(true); setSettingsError("");
+    const { error: renameError } = await supabase.rpc("rename_private_conversation", {
+      target_conversation_id: roomId, new_title: settingsTitle.trim(),
+    });
+    if (renameError) setSettingsError(renameError.message);
+    else await loadRooms(roomId);
+    setSettingsBusy(false);
+  }
+
+  async function addMembers(e) {
+    e.preventDefault();
+    const emails = newMemberEmails.split(/[,\n;]/).map((x) => x.trim().toLowerCase()).filter(Boolean);
+    if (!emails.length || settingsBusy) return;
+    setSettingsBusy(true); setSettingsError("");
+    const { error: addError } = await supabase.rpc("add_conversation_members", {
+      target_conversation_id: roomId, member_emails: emails,
+    });
+    if (addError) setSettingsError(addError.message);
+    else {
+      setNewMemberEmails("");
+      await Promise.all([loadMembers(), loadRooms(roomId)]);
+    }
+    setSettingsBusy(false);
+  }
+
+  async function removeMember(member) {
+    if (settingsBusy || !window.confirm(`Elimini ${member.email} din conversație?`)) return;
+    setSettingsBusy(true); setSettingsError("");
+    const { error: removeError } = await supabase.rpc("remove_conversation_member", {
+      target_conversation_id: roomId, target_user_id: member.user_id,
+    });
+    if (removeError) setSettingsError(removeError.message);
+    else await Promise.all([loadMembers(), loadRooms(roomId)]);
+    setSettingsBusy(false);
+  }
+
+  async function toggleAdmin(member) {
+    if (settingsBusy || !window.confirm(member.is_admin ? `Retragi rolul de administrator pentru ${member.email}?` : `Acordezi rolul de administrator lui ${member.email}?`)) return;
+    setSettingsBusy(true); setSettingsError("");
+    const { error: adminError } = await supabase.rpc("set_conversation_admin", {
+      target_conversation_id: roomId, target_user_id: member.user_id, make_admin: !member.is_admin,
+    });
+    if (adminError) setSettingsError(adminError.message);
+    else await loadMembers();
+    setSettingsBusy(false);
+  }
+
+  async function saveGroupPassword(e) {
+    e.preventDefault();
+    if (settingsBusy || groupPassword.length < 6) return;
+    setSettingsBusy(true); setSettingsError("");
+    const { error: passwordSetError } = await supabase.rpc("set_conversation_password", {
+      target_conversation_id: roomId, new_password: groupPassword,
+    });
+    if (passwordSetError) setSettingsError(passwordSetError.message);
+    else { setGroupPassword(""); setPasswordProtected(true); }
+    setSettingsBusy(false);
+  }
+
+  async function removeGroupPassword() {
+    if (settingsBusy || !window.confirm("Elimini parola suplimentară a grupului?")) return;
+    setSettingsBusy(true); setSettingsError("");
+    const { error: passwordRemoveError } = await supabase.rpc("set_conversation_password", {
+      target_conversation_id: roomId, new_password: "",
+    });
+    if (passwordRemoveError) setSettingsError(passwordRemoveError.message);
+    else { setGroupPassword(""); setPasswordProtected(false); }
+    setSettingsBusy(false);
+  }
+
+  async function leaveConversation() {
+    if (settingsBusy || !window.confirm("Părăsești această conversație? Nu vei mai vedea mesajele sau imaginile.")) return;
+    setSettingsBusy(true); setSettingsError("");
+    const { error: leaveError } = await supabase.rpc("leave_private_conversation", {
+      target_conversation_id: roomId,
+    });
+    if (leaveError) { setSettingsError(leaveError.message); setSettingsBusy(false); return; }
+    setSettingsOpen(false); setRoomId(null); await loadRooms(); setSettingsBusy(false);
+  }
+
+  async function removeStoredImages(conversationId) {
+    const { data: folders } = await supabase.storage.from("chat-images").list(conversationId, { limit: 1000 });
+    if (!folders) return;
+    const paths = [];
+    for (const folder of folders) {
+      const { data: files } = await supabase.storage.from("chat-images").list(`${conversationId}/${folder.name}`, { limit: 1000 });
+      for (const file of files || []) paths.push(`${conversationId}/${folder.name}/${file.name}`);
+    }
+    if (paths.length) await supabase.storage.from("chat-images").remove(paths);
+  }
+
+  async function deleteConversation() {
+    if (settingsBusy || !window.confirm("Ștergi definitiv conversația, mesajele și imaginile? Această acțiune nu poate fi anulată.")) return;
+    setSettingsBusy(true); setSettingsError("");
+    await removeStoredImages(roomId);
+    const { error: deleteError } = await supabase.rpc("delete_private_conversation", {
+      target_conversation_id: roomId,
+    });
+    if (deleteError) { setSettingsError(deleteError.message); setSettingsBusy(false); return; }
+    setSettingsOpen(false); setRoomId(null); await loadRooms(); setSettingsBusy(false);
+  }
+
   return <main className="app">
     <aside className="side">
       <div className="brandRow"><div><p className="eyebrow">eClinic</p><h2>Chat</h2></div><button className="logoutBtn" onClick={signOut} title="Ieșire din cont"><span className="logoutText">Ieșire</span><span className="logoutIcon" aria-hidden="true">↪</span></button></div>
@@ -234,7 +413,7 @@ function Chat({ session }) {
       <div className="user"><strong>{session.user.email}</strong><small>Conectat</small></div>
     </aside>
     <section className="chat">
-      {room ? <><header><div><strong>{room.title}</strong><small>{room.member_count} membri · numai membrii au acces</small></div><b>● Privat</b></header>
+      {room ? <><header><div><strong>{room.title}</strong><small>{room.member_count} membri · numai membrii au acces</small></div><div className="headerActions"><b>● Privat</b><button onClick={openSettings}>Gestionează</button></div></header>
         <div className="warning">Versiune de test. Nu introduce date medicale sau personale reale.</div>
         <div className="msgs">
           {messages.length === 0 && !error && <p className="status">Trimite primul mesaj.</p>}
@@ -256,6 +435,39 @@ function Chat({ session }) {
           <button className="primary" onClick={() => setModal(true)}>Creează prima conversație</button>{error && <p className="chatError">{error}</p>}</div>}
     </section>
     {modal && <NewConversation close={() => setModal(false)} created={(id) => { setModal(false); loadRooms(id); }} />}
+    {settingsOpen && room && <div className="modalBackdrop" onMouseDown={() => !settingsBusy && setSettingsOpen(false)}><section className="modal manageModal" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="modalTitle"><div><p className="eyebrow">Conversație privată</p><h2>Administrare</h2></div><button className="iconBtn" disabled={settingsBusy} onClick={() => setSettingsOpen(false)}>×</button></div>
+      {isAdmin && <form className="manageSection" onSubmit={renameConversation}>
+        <label>Numele conversației<div className="inlineForm"><input required maxLength={80} value={settingsTitle} onChange={(e) => setSettingsTitle(e.target.value)} /><button className="primary" disabled={settingsBusy || !settingsTitle.trim()}>Salvează</button></div></label>
+      </form>}
+      <div className="manageSection"><div className="sectionHeading"><strong>Membri</strong><small>{members.length}</small></div>
+        <div className="memberList">{members.map((member) => <div className="memberRow" key={member.user_id}><div><strong>{member.email}</strong><small>{member.is_owner ? "Proprietar · Administrator" : member.is_admin ? "Administrator" : "Membru"}</small></div>
+          <div className="memberActions">{isOwner && !member.is_owner && <button disabled={settingsBusy} onClick={() => toggleAdmin(member)}>{member.is_admin ? "Retrage admin" : "Fă admin"}</button>}
+          {isAdmin && !member.is_owner && (isOwner || !member.is_admin) && <button disabled={settingsBusy} onClick={() => removeMember(member)}>Elimină</button>}</div></div>)}</div>
+      </div>
+      {isAdmin && <form className="manageSection" onSubmit={addMembers}>
+        <label>Adaugă membri<textarea rows={2} placeholder="coleg@exemplu.ro" value={newMemberEmails} onChange={(e) => setNewMemberEmails(e.target.value)} /></label>
+        <p className="helper">Persoanele trebuie să aibă deja cont. Poți separa adresele prin virgulă.</p>
+        <button className="primary" disabled={settingsBusy || !newMemberEmails.trim()}>Adaugă</button>
+      </form>}
+      {isOwner && <form className="manageSection" onSubmit={saveGroupPassword}>
+        <div className="sectionHeading"><strong>Parolă suplimentară</strong><small>{passwordProtected ? "Activă" : "Inactivă"}</small></div>
+        <label>{passwordProtected ? "Schimbă parola grupului" : "Protejează grupul cu parolă"}<input type="password" minLength={6} maxLength={64} placeholder="Minimum 6 caractere" value={groupPassword} onChange={(e) => setGroupPassword(e.target.value)} /></label>
+        <p className="helper">Va fi cerută membrilor la fiecare deschidere a grupului. Parola nu este afișată și nu este stocată în clar.</p>
+        <div className="passwordActions"><button className="primary" disabled={settingsBusy || groupPassword.length < 6}>{passwordProtected ? "Schimbă parola" : "Activează parola"}</button>
+          {passwordProtected && <button type="button" disabled={settingsBusy} onClick={removeGroupPassword}>Elimină parola</button>}</div>
+      </form>}
+      {settingsError && <p className="error manageError">{settingsError}</p>}
+      <div className="dangerZone">{isOwner ? <button className="dangerBtn" disabled={settingsBusy} onClick={deleteConversation}>Șterge conversația</button> : <button className="dangerBtn" disabled={settingsBusy} onClick={leaveConversation}>Părăsește conversația</button>}</div>
+    </section></div>}
+    {passwordOpen && room && <div className="modalBackdrop"><section className="modal passwordModal">
+      <div className="lockMark">🔒</div><p className="eyebrow">Grup protejat</p><h2>{room.title}</h2>
+      <p className="muted">Introdu parola suplimentară pentru a deschide conversația.</p>
+      <form className="form" onSubmit={unlockConversation}><label>Parola grupului<input autoFocus type="password" value={roomPassword} onChange={(e) => setRoomPassword(e.target.value)} /></label>
+        {passwordError && <p className="error">{passwordError}</p>}
+        <div className="modalActions"><button type="button" disabled={passwordBusy} onClick={cancelPassword}>Renunță</button><button className="primary" disabled={passwordBusy || !roomPassword}>{passwordBusy ? "Se verifică..." : "Deschide grupul"}</button></div>
+      </form>
+    </section></div>}
     {logoutWarning && <div className="modalBackdrop"><section className="modal timeoutModal">
       <p className="eyebrow">Sesiune inactivă</p><h2>Vei fi delogat în {logoutCountdown} secunde</h2>
       <p className="muted">Pentru protejarea contului, sesiunea se închide automat după 15 minute fără activitate.</p>
