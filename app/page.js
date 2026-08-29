@@ -86,11 +86,14 @@ function Chat({ session }) {
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [attachment, setAttachment] = useState(null);
+  const [imageUrls, setImageUrls] = useState({});
   const [error, setError] = useState("");
   const [modal, setModal] = useState(false);
   const [logoutWarning, setLogoutWarning] = useState(false);
   const [logoutCountdown, setLogoutCountdown] = useState(60);
   const bottom = useRef(null);
+  const fileInput = useRef(null);
   const inactivityTimer = useRef(null);
   const warningTimer = useRef(null);
   const countdownTimer = useRef(null);
@@ -163,17 +166,54 @@ function Chat({ session }) {
   }, [roomId]);
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
+  useEffect(() => {
+    let active = true;
+    const paths = messages.map((item) => item.attachment_path).filter((path) => path && !imageUrls[path]);
+    if (!paths.length) return;
+    Promise.all(paths.map(async (path) => {
+      const { data } = await supabase.storage.from("chat-images").createSignedUrl(path, 60 * 60);
+      return [path, data?.signedUrl || ""];
+    })).then((entries) => {
+      if (active) setImageUrls((current) => ({ ...current, ...Object.fromEntries(entries) }));
+    });
+    return () => { active = false; };
+  }, [messages, imageUrls]);
+
+  function chooseFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+    if (!allowed.includes(file.type)) { setError("Poți atașa numai imagini JPG, PNG, WEBP sau HEIC."); e.target.value = ""; return; }
+    if (file.size > 10 * 1024 * 1024) { setError("Imaginea trebuie să aibă cel mult 10 MB."); e.target.value = ""; return; }
+    setError("");
+    setAttachment(file);
+  }
+
   async function send(e) {
     e.preventDefault();
     const body = draft.trim();
-    if (!body || !roomId || sending) return;
+    if ((!body && !attachment) || !roomId || sending) return;
     setSending(true); setError("");
+    let attachmentData = {};
+    let uploadedPath = null;
+    if (attachment) {
+      const extension = attachment.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+      uploadedPath = `${roomId}/${session.user.id}/${crypto.randomUUID()}.${extension}`;
+      const { error: uploadError } = await supabase.storage.from("chat-images").upload(uploadedPath, attachment, { contentType: attachment.type, upsert: false });
+      if (uploadError) { setError("Imaginea nu a putut fi încărcată."); setSending(false); return; }
+      attachmentData = { attachment_path: uploadedPath, attachment_name: attachment.name, attachment_type: attachment.type, attachment_size: attachment.size };
+    }
     const { data, error: sendError } = await supabase.from("private_messages").insert({
-      conversation_id: roomId, user_id: session.user.id, sender_email: session.user.email, body,
+      conversation_id: roomId, user_id: session.user.id, sender_email: session.user.email, body: body || null, ...attachmentData,
     }).select().single();
-    if (sendError) setError("Mesajul nu a fost trimis.");
+    if (sendError) {
+      if (uploadedPath) await supabase.storage.from("chat-images").remove([uploadedPath]);
+      setError("Mesajul nu a fost trimis.");
+    }
     else {
       setDraft("");
+      setAttachment(null);
+      if (fileInput.current) fileInput.current.value = "";
       setMessages((current) => current.some((x) => x.id === data.id) ? current : [...current, data]);
       loadRooms(roomId);
     }
@@ -199,12 +239,18 @@ function Chat({ session }) {
         <div className="msgs">
           {messages.length === 0 && !error && <p className="status">Trimite primul mesaj.</p>}
           {messages.map((item) => { const mine = item.user_id === session.user.id; return <div key={item.id} className={`bubble ${mine ? "mine" : ""}`}>
-            {!mine && <strong className="sender">{item.sender_email || "Utilizator"}</strong>}<p>{item.body}</p><small>{time(item.created_at)}</small>
+            {!mine && <strong className="sender">{item.sender_email || "Utilizator"}</strong>}
+            {item.attachment_path && imageUrls[item.attachment_path] && <a href={imageUrls[item.attachment_path]} target="_blank" rel="noreferrer"><img className="chatImage" src={imageUrls[item.attachment_path]} alt={item.attachment_name || "Imagine atașată"} /></a>}
+            {item.attachment_path && !imageUrls[item.attachment_path] && <p className="imageLoading">Se încarcă imaginea...</p>}
+            {item.body && <p>{item.body}</p>}<small>{time(item.created_at)}</small>
           </div>; })}<div ref={bottom} />
         </div>
         <div>{error && <p className="chatError">{error}</p>}<form className="composer" onSubmit={send}>
+          <input ref={fileInput} className="fileInput" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" onChange={chooseFile} />
+          <button className="attachBtn" type="button" onClick={() => fileInput.current?.click()} disabled={sending} title="Atașează imagine" aria-label="Atașează imagine">📎</button>
           <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Scrie un mesaj..." maxLength={4000} disabled={sending} />
-          <button className="primary" disabled={sending || !draft.trim()}>{sending ? "Se trimite..." : "Trimite"}</button>
+          <button className="primary" disabled={sending || (!draft.trim() && !attachment)}>{sending ? "Se trimite..." : "Trimite"}</button>
+          {attachment && <div className="selectedFile"><span>{attachment.name}</span><button type="button" onClick={() => { setAttachment(null); if (fileInput.current) fileInput.current.value = ""; }}>×</button></div>}
         </form></div></> :
         <div className="welcome"><div className="logo">eC</div><h2>Conversații private</h2><p>Creează o conversație și adaugă colegii care au deja cont.</p>
           <button className="primary" onClick={() => setModal(true)}>Creează prima conversație</button>{error && <p className="chatError">{error}</p>}</div>}
