@@ -53,9 +53,14 @@ function Login() {
   </section></main>;
 }
 
-function NewConversation({ close, created }) {
+function NewConversation({ close, created, communities, selectedCommunityId, isGeneralAdmin }) {
   const [title, setTitle] = useState("");
   const [emails, setEmails] = useState("");
+  const allowedCommunities = communities.filter((item) => item.my_is_admin);
+  const initialCommunity = selectedCommunityId && selectedCommunityId !== "all" && selectedCommunityId !== "private"
+    ? selectedCommunityId : isGeneralAdmin ? "" : (allowedCommunities[0]?.id || "");
+  const [communityId, setCommunityId] = useState(initialCommunity);
+  const [initialPassword, setInitialPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -64,8 +69,9 @@ function NewConversation({ close, created }) {
     setBusy(true);
     setError("");
     const memberEmails = emails.split(/[,\n;]/).map((x) => x.trim().toLowerCase()).filter(Boolean);
-    const { data, error: rpcError } = await supabase.rpc("create_private_conversation", {
+    const { data, error: rpcError } = await supabase.rpc("create_managed_conversation", {
       conversation_title: title.trim(), member_emails: memberEmails,
+      target_community_id: communityId || null, initial_password: initialPassword || null,
     });
     if (rpcError) setError(rpcError.message);
     else created(data);
@@ -73,12 +79,17 @@ function NewConversation({ close, created }) {
   }
 
   return <div className="modalBackdrop" onMouseDown={close}><section className="modal" onMouseDown={(e) => e.stopPropagation()}>
-    <div className="modalTitle"><div><p className="eyebrow">Conversație privată</p><h2>Conversație nouă</h2></div>
+    <div className="modalTitle"><div><p className="eyebrow">Grup privat</p><h2>Grup nou</h2></div>
       <button className="iconBtn" onClick={close}>×</button></div>
     <form className="form" onSubmit={submit}>
-      <label>Numele conversației<input required maxLength={80} value={title} onChange={(e) => setTitle(e.target.value)} /></label>
+      <label>Numele grupului<input required maxLength={80} value={title} onChange={(e) => setTitle(e.target.value)} /></label>
+      <label>Locul grupului<select value={communityId} onChange={(e) => setCommunityId(e.target.value)}>
+        {isGeneralAdmin && <option value="">Grup privat independent</option>}
+        {allowedCommunities.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+      </select></label>
       <label>Emailurile membrilor<textarea rows={4} placeholder="medic1@exemplu.ro, medic2@exemplu.ro" value={emails} onChange={(e) => setEmails(e.target.value)} /></label>
-      <p className="helper">Persoanele trebuie să aibă deja cont. Separă emailurile prin virgulă.</p>
+      <p className="helper">Pentru un grup din comunitate, persoanele trebuie adăugate mai întâi în comunitate.</p>
+      <label>Parolă suplimentară opțională<input type="password" minLength={6} maxLength={64} placeholder="Lasă liber dacă nu dorești parolă" value={initialPassword} onChange={(e) => setInitialPassword(e.target.value)} /></label>
       {error && <p className="error">{error}</p>}
       <div className="modalActions"><button type="button" onClick={close}>Renunță</button>
         <button className="primary" disabled={busy || !title.trim()}>{busy ? "Se creează..." : "Creează"}</button></div>
@@ -86,8 +97,43 @@ function NewConversation({ close, created }) {
   </section></div>;
 }
 
+function NewCommunity({ close, created }) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function submit(e) {
+    e.preventDefault(); setBusy(true); setError("");
+    const { data, error: createError } = await supabase.rpc("create_community", {
+      community_name: name.trim(), community_description: description.trim(),
+    });
+    if (createError) setError(createError.message); else created(data);
+    setBusy(false);
+  }
+  return <div className="modalBackdrop" onMouseDown={close}><section className="modal" onMouseDown={(e) => e.stopPropagation()}>
+    <div className="modalTitle"><div><p className="eyebrow">eClinic</p><h2>Comunitate nouă</h2></div><button className="iconBtn" onClick={close}>×</button></div>
+    <form className="form" onSubmit={submit}>
+      <label>Numele comunității<input required maxLength={80} value={name} onChange={(e) => setName(e.target.value)} /></label>
+      <label>Descriere<textarea rows={3} maxLength={500} value={description} onChange={(e) => setDescription(e.target.value)} /></label>
+      {error && <p className="error">{error}</p>}
+      <div className="modalActions"><button type="button" onClick={close}>Renunță</button><button className="primary" disabled={busy || !name.trim()}>{busy ? "Se creează..." : "Creează"}</button></div>
+    </form>
+  </section></div>;
+}
+
 function Chat({ session }) {
   const [rooms, setRooms] = useState([]);
+  const [communities, setCommunities] = useState([]);
+  const [selectedCommunityId, setSelectedCommunityId] = useState("all");
+  const [isGeneralAdmin, setIsGeneralAdmin] = useState(false);
+  const [communityModal, setCommunityModal] = useState(false);
+  const [communitySettingsOpen, setCommunitySettingsOpen] = useState(false);
+  const [communityMembers, setCommunityMembers] = useState([]);
+  const [communityName, setCommunityName] = useState("");
+  const [communityDescription, setCommunityDescription] = useState("");
+  const [communityMemberEmails, setCommunityMemberEmails] = useState("");
+  const [communityBusy, setCommunityBusy] = useState(false);
+  const [communityError, setCommunityError] = useState("");
   const [roomId, setRoomId] = useState(null);
   const [unlockedRoomId, setUnlockedRoomId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -124,6 +170,11 @@ function Chat({ session }) {
   const warningTimer = useRef(null);
   const countdownTimer = useRef(null);
   const room = rooms.find((x) => x.id === roomId);
+  const selectedCommunity = communities.find((x) => x.id === selectedCommunityId);
+  const visibleRooms = rooms.filter((item) => selectedCommunityId === "all" ? true : selectedCommunityId === "private" ? !item.community_id : item.community_id === selectedCommunityId);
+  const canCreateGroup = selectedCommunityId === "private"
+    ? isGeneralAdmin
+    : isGeneralAdmin || communities.some((item) => item.my_is_admin);
   const currentMembership = members.find((x) => x.user_id === session.user.id);
   const isOwner = room?.created_by === session.user.id;
   const isAdmin = Boolean(isOwner || currentMembership?.is_admin);
@@ -168,7 +219,7 @@ function Chat({ session }) {
 
   async function loadRooms(preferredId) {
     const { data, error: loadError } = await supabase.from("my_conversations").select("*").order("is_pinned", { ascending: false }).order("updated_at", { ascending: false });
-    if (loadError) setError("Conversațiile nu au putut fi încărcate. Rulează scriptul SQL v0.5.");
+    if (loadError) setError("Grupurile nu au putut fi încărcate. Verifică instalarea scriptului SQL v1.0.");
     else {
       const list = data || [];
       setRooms(list);
@@ -177,7 +228,20 @@ function Chat({ session }) {
     setLoading(false);
   }
 
-  useEffect(() => { loadRooms(); }, []);
+  async function loadCommunities(preferredId) {
+    const [{ data: contextData, error: contextError }, { data, error: communityLoadError }] = await Promise.all([
+      supabase.rpc("get_app_context"), supabase.rpc("get_my_communities"),
+    ]);
+    if (!contextError) setIsGeneralAdmin(Boolean(contextData?.[0]?.is_general_admin));
+    if (communityLoadError) setError("Comunitățile nu au putut fi încărcate. Rulează scriptul SQL v1.0.");
+    else {
+      const list = data || [];
+      setCommunities(list);
+      if (preferredId && list.some((item) => item.id === preferredId)) setSelectedCommunityId(preferredId);
+    }
+  }
+
+  useEffect(() => { loadRooms(); loadCommunities(); }, []);
   useEffect(() => {
     if (!roomId) { setMessages([]); setUnlockedRoomId(null); return; }
     if (unlockedRoomId === roomId) return;
@@ -329,6 +393,77 @@ function Chat({ session }) {
     else setMembers(data || []);
   }
 
+  async function loadCommunityMembers() {
+    if (!selectedCommunity) return;
+    setCommunityError("");
+    const { data, error: memberError } = await supabase.rpc("get_community_members", {
+      target_community_id: selectedCommunity.id,
+    });
+    if (memberError) setCommunityError(memberError.message); else setCommunityMembers(data || []);
+  }
+
+  async function openCommunitySettings() {
+    if (!selectedCommunity) return;
+    setCommunityName(selectedCommunity.name);
+    setCommunityDescription(selectedCommunity.description || "");
+    setCommunityMemberEmails(""); setCommunityMembers([]); setCommunityError("");
+    setCommunitySettingsOpen(true);
+    await loadCommunityMembers();
+  }
+
+  async function saveCommunity(e) {
+    e.preventDefault();
+    if (!selectedCommunity || communityBusy || !communityName.trim()) return;
+    setCommunityBusy(true); setCommunityError("");
+    const { error: saveError } = await supabase.rpc("update_community", {
+      target_community_id: selectedCommunity.id, new_name: communityName.trim(), new_description: communityDescription.trim(),
+    });
+    if (saveError) setCommunityError(saveError.message); else await loadCommunities(selectedCommunity.id);
+    setCommunityBusy(false);
+  }
+
+  async function addCommunityMembers(e) {
+    e.preventDefault();
+    const emails = communityMemberEmails.split(/[,\n;]/).map((x) => x.trim().toLowerCase()).filter(Boolean);
+    if (!selectedCommunity || !emails.length || communityBusy) return;
+    setCommunityBusy(true); setCommunityError("");
+    const { error: addError } = await supabase.rpc("add_community_members", {
+      target_community_id: selectedCommunity.id, member_emails: emails,
+    });
+    if (addError) setCommunityError(addError.message);
+    else { setCommunityMemberEmails(""); await Promise.all([loadCommunityMembers(),loadCommunities(selectedCommunity.id)]); }
+    setCommunityBusy(false);
+  }
+
+  async function toggleCommunityAdmin(member) {
+    if (!selectedCommunity || communityBusy || !window.confirm(member.is_admin ? `Retragi rolul de administrator pentru ${member.email}?` : `Acordezi rolul de administrator lui ${member.email}?`)) return;
+    setCommunityBusy(true); setCommunityError("");
+    const { error: adminError } = await supabase.rpc("set_community_admin", {
+      target_community_id: selectedCommunity.id,target_user_id: member.user_id,make_admin: !member.is_admin,
+    });
+    if (adminError) setCommunityError(adminError.message); else await loadCommunityMembers();
+    setCommunityBusy(false);
+  }
+
+  async function removeCommunityMember(member) {
+    if (!selectedCommunity || communityBusy || !window.confirm(`Elimini ${member.email} din comunitate și din grupurile ei?`)) return;
+    setCommunityBusy(true); setCommunityError("");
+    const { error: removeError } = await supabase.rpc("remove_community_member", {
+      target_community_id: selectedCommunity.id,target_user_id: member.user_id,
+    });
+    if (removeError) setCommunityError(removeError.message);
+    else await Promise.all([loadCommunityMembers(),loadCommunities(selectedCommunity.id),loadRooms()]);
+    setCommunityBusy(false);
+  }
+
+  async function deleteCommunity() {
+    if (!selectedCommunity || communityBusy || !window.confirm("Ștergi comunitatea? Aceasta trebuie să nu mai conțină grupuri.")) return;
+    setCommunityBusy(true); setCommunityError("");
+    const { error: deleteError } = await supabase.rpc("delete_community", { target_community_id: selectedCommunity.id });
+    if (deleteError) { setCommunityError(deleteError.message); setCommunityBusy(false); return; }
+    setCommunitySettingsOpen(false); setSelectedCommunityId("all"); await loadCommunities(); setCommunityBusy(false);
+  }
+
   async function openSettings() {
     setSettingsOpen(true);
     setSettingsTitle(room?.title || "");
@@ -470,20 +605,29 @@ function Chat({ session }) {
 
   return <main className="app">
     <aside className="side">
-      <div className="brandRow"><div><p className="eyebrow">eClinic</p><h2>Chat</h2></div><button className="logoutBtn" onClick={signOut} title="Ieșire din cont"><span className="logoutText">Ieșire</span><span className="logoutIcon" aria-hidden="true">↪</span></button></div>
-      <button className="primary newBtn" onClick={() => setModal(true)}>+ Conversație nouă</button>
+      <div className="brandRow"><div><p className="eyebrow">eClinic</p><h2>Comunități</h2></div><button className="logoutBtn" onClick={signOut} title="Ieșire din cont"><span className="logoutText">Ieșire</span><span className="logoutIcon" aria-hidden="true">↪</span></button></div>
+      <div className="communityNav">
+        <div className="communityNavTitle"><strong>Comunități</strong>{isGeneralAdmin && <button title="Comunitate nouă" onClick={() => setCommunityModal(true)}>＋</button>}</div>
+        <button className={selectedCommunityId === "all" ? "selected" : ""} onClick={() => { setSelectedCommunityId("all"); setRoomId(null); }}>Toate grupurile</button>
+        <button className={selectedCommunityId === "private" ? "selected" : ""} onClick={() => { setSelectedCommunityId("private"); setRoomId(null); }}>Grupuri independente</button>
+        {communities.map((item) => <button key={item.id} className={selectedCommunityId === item.id ? "selected" : ""} onClick={() => { setSelectedCommunityId(item.id); setRoomId(null); }}>
+          <span>◉</span><div><strong>{item.name}</strong><small>{item.group_count} grupuri · {item.member_count} membri</small></div>
+        </button>)}
+      </div>
+      {selectedCommunity?.my_is_admin && <button className="manageCommunityBtn" onClick={openCommunitySettings}>⚙ Administrează comunitatea</button>}
+      {canCreateGroup && <button className="primary newBtn" onClick={() => setModal(true)}>+ Grup nou</button>}
       <div className="conversationList">
         {loading && <p className="status">Se încarcă...</p>}
-        {!loading && rooms.length === 0 && <p className="emptySide">Nu ai încă nicio conversație.</p>}
-        {rooms.map((item) => <button className={`conv ${item.id === roomId ? "active" : ""}`} key={item.id} onClick={() => setRoomId(item.id)}>
-          <span>{item.title.slice(0, 2).toUpperCase()}</span><div><strong>{item.is_pinned && "📌 "}{item.title}</strong><small>{item.member_count} membri · privat</small></div>
+        {!loading && visibleRooms.length === 0 && <p className="emptySide">Nu ai grupuri în această secțiune.</p>}
+        {visibleRooms.map((item) => <button className={`conv ${item.id === roomId ? "active" : ""}`} key={item.id} onClick={() => setRoomId(item.id)}>
+          <span>{item.title.slice(0, 2).toUpperCase()}</span><div><strong>{item.is_pinned && "📌 "}{item.title}</strong><small>{item.member_count} membri · {item.community_name || "independent"}</small></div>
           {!item.password_protected && item.unread_count > 0 && <i className="unreadBadge">{item.unread_count > 99 ? "99+" : item.unread_count}</i>}
         </button>)}
       </div>
-      <div className="user"><strong>{session.user.email}</strong><small>Conectat</small></div>
+      <div className="user"><strong>{session.user.email}</strong><small>{isGeneralAdmin ? "Administrator general" : "Conectat"}</small></div>
     </aside>
     <section className="chat">
-      {room ? <><header><div><strong>{room.title}</strong><small>{room.member_count} membri · numai membrii au acces</small></div><div className="headerActions"><b>● Privat</b><button onClick={toggleGroupPin}>{room.is_pinned ? "📌 Fixat" : "Fixează sus"}</button><button onClick={openSettings}>Gestionează</button></div></header>
+      {room ? <><header><div><strong>{room.title}</strong><small>{room.member_count} membri · {room.community_name || "grup independent"} · numai membrii au acces</small></div><div className="headerActions"><b>● Privat</b><button onClick={toggleGroupPin}>{room.is_pinned ? "📌 Fixat" : "Fixează sus"}</button><button onClick={openSettings}>Gestionează</button></div></header>
         <div className="warning">Versiune de test. Nu introduce date medicale sau personale reale.</div>
         <div className="msgs">
           {pinnedMessages.length > 0 && <div className="pinnedArea">
@@ -525,14 +669,15 @@ function Chat({ session }) {
           {emojiOpen && <div className="emojiPicker">{QUICK_EMOJIS.map((emoji) => <button type="button" key={emoji} onClick={() => insertEmoji(emoji)}>{emoji}</button>)}</div>}
           {attachment && <div className="selectedFile"><span>{attachment.name}</span><button type="button" onClick={() => { setAttachment(null); if (fileInput.current) fileInput.current.value = ""; }}>×</button></div>}
         </form></div></> :
-        <div className="welcome"><div className="logo">eC</div><h2>Conversații private</h2><p>{rooms.length ? "Selectează o conversație din listă pentru a o deschide." : "Creează o conversație și adaugă colegii care au deja cont."}</p>
-          {!rooms.length && <button className="primary" onClick={() => setModal(true)}>Creează prima conversație</button>}{error && <p className="chatError">{error}</p>}</div>}
+        <div className="welcome"><div className="logo">eC</div><h2>{selectedCommunity?.name || "Grupuri private"}</h2><p>{visibleRooms.length ? "Selectează un grup din listă pentru a-l deschide." : canCreateGroup ? "Poți crea primul grup din această secțiune." : "Nu există încă grupuri disponibile."}</p>
+          {!visibleRooms.length && canCreateGroup && <button className="primary" onClick={() => setModal(true)}>Creează primul grup</button>}{error && <p className="chatError">{error}</p>}</div>}
     </section>
-    {modal && <NewConversation close={() => setModal(false)} created={(id) => { setModal(false); loadRooms(id); }} />}
+    {modal && <NewConversation close={() => setModal(false)} communities={communities} selectedCommunityId={selectedCommunityId} isGeneralAdmin={isGeneralAdmin} created={(id) => { setModal(false); loadRooms(id); loadCommunities(); }} />}
+    {communityModal && <NewCommunity close={() => setCommunityModal(false)} created={(id) => { setCommunityModal(false); loadCommunities(id); }} />}
     {settingsOpen && room && <div className="modalBackdrop" onMouseDown={() => !settingsBusy && setSettingsOpen(false)}><section className="modal manageModal" onMouseDown={(e) => e.stopPropagation()}>
-      <div className="modalTitle"><div><p className="eyebrow">Conversație privată</p><h2>Administrare</h2></div><button className="iconBtn" disabled={settingsBusy} onClick={() => setSettingsOpen(false)}>×</button></div>
+      <div className="modalTitle"><div><p className="eyebrow">Grup privat</p><h2>Administrare</h2></div><button className="iconBtn" disabled={settingsBusy} onClick={() => setSettingsOpen(false)}>×</button></div>
       {isAdmin && <form className="manageSection" onSubmit={renameConversation}>
-        <label>Numele conversației<div className="inlineForm"><input required maxLength={80} value={settingsTitle} onChange={(e) => setSettingsTitle(e.target.value)} /><button className="primary" disabled={settingsBusy || !settingsTitle.trim()}>Salvează</button></div></label>
+        <label>Numele grupului<div className="inlineForm"><input required maxLength={80} value={settingsTitle} onChange={(e) => setSettingsTitle(e.target.value)} /><button className="primary" disabled={settingsBusy || !settingsTitle.trim()}>Salvează</button></div></label>
       </form>}
       <div className="manageSection"><div className="sectionHeading"><strong>Membri</strong><small>{members.length}</small></div>
         <div className="memberList">{members.map((member) => <div className="memberRow" key={member.user_id}><div><strong>{member.email}</strong><small>{member.is_owner ? "Proprietar · Administrator" : member.is_admin ? "Administrator" : "Membru"}</small></div>
@@ -544,7 +689,7 @@ function Chat({ session }) {
         <p className="helper">Persoanele trebuie să aibă deja cont. Poți separa adresele prin virgulă.</p>
         <button className="primary" disabled={settingsBusy || !newMemberEmails.trim()}>Adaugă</button>
       </form>}
-      {isOwner && <form className="manageSection" onSubmit={saveGroupPassword}>
+      {isAdmin && <form className="manageSection" onSubmit={saveGroupPassword}>
         <div className="sectionHeading"><strong>Parolă suplimentară</strong><small>{passwordProtected ? "Activă" : "Inactivă"}</small></div>
         <label>{passwordProtected ? "Schimbă parola grupului" : "Protejează grupul cu parolă"}<input type="password" minLength={6} maxLength={64} placeholder="Minimum 6 caractere" value={groupPassword} onChange={(e) => setGroupPassword(e.target.value)} /></label>
         <p className="helper">Va fi cerută membrilor la fiecare deschidere a grupului. Parola nu este afișată și nu este stocată în clar.</p>
@@ -553,6 +698,27 @@ function Chat({ session }) {
       </form>}
       {settingsError && <p className="error manageError">{settingsError}</p>}
       <div className="dangerZone">{isOwner ? <button className="dangerBtn" disabled={settingsBusy} onClick={deleteConversation}>Șterge conversația</button> : <button className="dangerBtn" disabled={settingsBusy} onClick={leaveConversation}>Părăsește conversația</button>}</div>
+    </section></div>}
+    {communitySettingsOpen && selectedCommunity && <div className="modalBackdrop" onMouseDown={() => !communityBusy && setCommunitySettingsOpen(false)}><section className="modal manageModal" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="modalTitle"><div><p className="eyebrow">Comunitate</p><h2>Administrare</h2></div><button className="iconBtn" disabled={communityBusy} onClick={() => setCommunitySettingsOpen(false)}>×</button></div>
+      <form className="manageSection" onSubmit={saveCommunity}>
+        <label>Numele comunității<input required maxLength={80} value={communityName} onChange={(e) => setCommunityName(e.target.value)} /></label>
+        <label>Descriere<textarea rows={2} maxLength={500} value={communityDescription} onChange={(e) => setCommunityDescription(e.target.value)} /></label>
+        <button className="primary" disabled={communityBusy || !communityName.trim()}>Salvează</button>
+      </form>
+      <div className="manageSection"><div className="sectionHeading"><strong>Membrii comunității</strong><small>{communityMembers.length}</small></div>
+        <div className="memberList">{communityMembers.map((member) => <div className="memberRow" key={member.user_id}><div><strong>{member.email}</strong><small>{member.is_admin ? "Administrator de comunitate" : "Membru"}</small></div>
+          <div className="memberActions">{isGeneralAdmin && member.user_id !== session.user.id && <button disabled={communityBusy} onClick={() => toggleCommunityAdmin(member)}>{member.is_admin ? "Retrage admin" : "Fă admin"}</button>}
+          {member.user_id !== session.user.id && (!member.is_admin || isGeneralAdmin) && <button disabled={communityBusy} onClick={() => removeCommunityMember(member)}>Elimină</button>}</div>
+        </div>)}</div>
+      </div>
+      <form className="manageSection" onSubmit={addCommunityMembers}>
+        <label>Adaugă membri<textarea rows={2} placeholder="coleg@exemplu.ro" value={communityMemberEmails} onChange={(e) => setCommunityMemberEmails(e.target.value)} /></label>
+        <p className="helper">Persoanele trebuie să aibă deja cont. Adresele pot fi separate prin virgulă.</p>
+        <button className="primary" disabled={communityBusy || !communityMemberEmails.trim()}>Adaugă în comunitate</button>
+      </form>
+      {communityError && <p className="error manageError">{communityError}</p>}
+      {isGeneralAdmin && <div className="dangerZone"><button className="dangerBtn" disabled={communityBusy} onClick={deleteCommunity}>Șterge comunitatea</button></div>}
     </section></div>}
     {passwordOpen && room && <div className="modalBackdrop"><section className="modal passwordModal">
       <div className="lockMark">🔒</div><p className="eyebrow">Grup protejat</p><h2>{room.title}</h2>

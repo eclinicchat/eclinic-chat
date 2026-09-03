@@ -1,22 +1,38 @@
-# eClinic Chat v0.9.1
+# eClinic Chat v1.0
 
-MVP cu autentificare Supabase, conversații private și trimitere de imagini de maximum 10 MB, vizibile numai membrilor. Include administratori multipli, parolă suplimentară opțională, reply la text și imagini, emoticoane, reacții, pin și contoare de necitite.
+Versiunea 1.0 adaugă organizarea pe comunități și reguli clare pentru administratori, păstrând conversațiile private, imaginile, răspunsurile, reacțiile, mesajele fixate și contoarele de mesaje necitite.
 
-Actualizarea v0.9.1 mărește comenzile pentru răspuns, reacții și pin, extinde selecția de emoticoane și permite alegerea oricărui mesaj din lista mesajelor fixate. Nu necesită un script SQL nou dacă v0.9 este deja instalată.
+## Actualizare de la v0.9 sau v0.9.1
 
-1. Pentru actualizarea de la v0.8.1, rulează numai `supabase-messaging-v0.9.sql` în Supabase SQL Editor.
-2. Pentru o instalare nouă, rulează în ordine `supabase-private-chat.sql`, `supabase-chat-images.sql`, `supabase-conversation-management.sql` și `supabase-messaging-v0.9.sql`.
-3. În Vercel păstrează `NEXT_PUBLIC_SUPABASE_URL` și `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
-4. Publică această versiune prin GitHub/Vercel.
+1. Rulează integral, o singură dată, fișierul `supabase-communities-v1.0.sql` în Supabase: SQL Editor → New query → Run.
+2. Încarcă în GitHub fișierele aplicației din această arhivă și publică prin Vercel.
+3. Nu rula din nou scripturile SQL vechi.
 
-Creatorul este proprietarul conversației și poate acorda sau retrage rolul de administrator. Administratorii pot redenumi grupul și gestiona membrii; numai proprietarul poate modifica administratorii, parola grupului și poate șterge conversația. Ceilalți membri pot părăsi conversația.
+Contul `cosmin@test.com` este introdus ca administrator general. Contul trebuie să existe deja în Supabase Authentication înainte de rularea scriptului v1.0.
 
-Parola suplimentară este cerută la fiecare redeschidere a grupului, este stocată numai ca hash și se blochează timp de 5 minute după 5 încercări greșite. Aceasta este o protecție suplimentară a interfeței, nu criptare end-to-end.
+## Instalare nouă
 
-La conectarea în aplicație nu se deschide automat niciun grup. Parola suplimentară este solicitată numai după ce utilizatorul apasă pe conversația protejată.
+Rulează în această ordine:
 
-Grupurile pot fi fixate individual în partea de sus. Administratorii pot fixa mesaje importante. Contoarele de mesaje necitite nu sunt afișate pentru grupurile protejate cu parolă.
+1. `supabase-private-chat.sql`
+2. `supabase-chat-images.sql`
+3. `supabase-conversation-management.sql`
+4. `supabase-messaging-v0.9.sql`
+5. `supabase-communities-v1.0.sql`
 
-Un utilizator trebuie să aibă deja cont înainte să fie adăugat după email.
+În Vercel trebuie păstrate variabilele `NEXT_PUBLIC_SUPABASE_URL` și `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+
+## Reguli de acces
+
+- Administratorul general creează și șterge comunități și desemnează administratorii lor.
+- Administratorul unei comunități gestionează membrii și poate crea grupuri numai în comunitatea sa.
+- Numai administratorii pot crea grupuri; creatorul devine proprietarul grupului.
+- Numai proprietarul acordă sau retrage rolul de administrator al grupului și poate șterge grupul.
+- Proprietarul și administratorii grupului pot redenumi grupul, gestiona membrii, schimba parola și fixa mesaje.
+- Proprietarul nu poate fi eliminat din grup.
+- Administratorul general nu intră automat într-un grup privat și nu îi vede mesajele dacă nu este membru.
+- Acțiunile administrative importante sunt înregistrate în jurnalul aplicației.
+
+Parola suplimentară este cerută numai după selectarea grupului protejat. Ea este stocată ca hash și se blochează temporar după cinci încercări greșite. Contoarele de mesaje necitite nu sunt afișate pentru grupurile protejate.
 
 Versiune de test: nu folosi date medicale reale. Criptarea end-to-end și cerințele complete pentru o aplicație medicală nu sunt implementate.
