@@ -1,4 +1,12 @@
-# eClinic Chat v1.0
+# eClinic Chat v1.1
+
+## Actualizare de securitate de la v1.0
+
+1. Rulează integral, o singură dată, fișierul `supabase-security-v1.1.sql` în Supabase: **SQL Editor → New query → Run**.
+2. Încarcă în GitHub fișierele actualizate ale aplicației și publică prin Vercel.
+3. Nu rula din nou scripturile SQL vechi.
+
+Actualizarea v1.1 impune parola grupului și în baza de date pentru mesaje, reacții și imagini. Deblocarea expiră după 15 minute și se închide la schimbarea grupului sau la ieșirea din cont.
 
 Versiunea 1.0 adaugă organizarea pe comunități și reguli clare pentru administratori, păstrând conversațiile private, imaginile, răspunsurile, reacțiile, mesajele fixate și contoarele de mesaje necitite.
 

@@ -169,6 +169,7 @@ function Chat({ session }) {
   const inactivityTimer = useRef(null);
   const warningTimer = useRef(null);
   const countdownTimer = useRef(null);
+  const previousRoomId = useRef(null);
   const room = rooms.find((x) => x.id === roomId);
   const selectedCommunity = communities.find((x) => x.id === selectedCommunityId);
   const visibleRooms = rooms.filter((item) => selectedCommunityId === "all" ? true : selectedCommunityId === "private" ? !item.community_id : item.community_id === selectedCommunityId);
@@ -184,8 +185,19 @@ function Chat({ session }) {
     clearTimeout(inactivityTimer.current);
     clearTimeout(warningTimer.current);
     clearInterval(countdownTimer.current);
+    if (roomId) {
+      await supabase.rpc("lock_conversation", { target_conversation_id: roomId });
+    }
     await supabase.auth.signOut();
   }
+
+  useEffect(() => {
+    const previous = previousRoomId.current;
+    if (previous && previous !== roomId) {
+      supabase.rpc("lock_conversation", { target_conversation_id: previous });
+    }
+    previousRoomId.current = roomId;
+  }, [roomId]);
 
   useEffect(() => {
     function resetInactivity() {
