@@ -222,6 +222,7 @@ function Chat({ session }) {
   const [passwordProtected, setPasswordProtected] = useState(false);
   const [logoutWarning, setLogoutWarning] = useState(false);
   const [logoutCountdown, setLogoutCountdown] = useState(60);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const bottom = useRef(null);
   const messageRefs = useRef({});
   const fileInput = useRef(null);
@@ -239,6 +240,17 @@ function Chat({ session }) {
   const isOwner = room?.created_by === session.user.id;
   const isAdmin = Boolean(isOwner || currentMembership?.is_admin);
   const pinnedMessages = messages.filter((x) => x.pinned_at).sort((a, b) => new Date(b.pinned_at) - new Date(a.pinned_at));
+
+  function chooseCommunity(id) {
+    setSelectedCommunityId(id);
+    setRoomId(null);
+    setMobileMenuOpen(false);
+  }
+
+  function chooseRoom(id) {
+    setRoomId(id);
+    setMobileMenuOpen(false);
+  }
 
   async function signOut() {
     clearTimeout(inactivityTimer.current);
@@ -675,13 +687,13 @@ function Chat({ session }) {
   }
 
   return <main className="app">
-    <aside className="side">
-      <div className="brandRow"><div><p className="eyebrow">eClinic</p><h2>Comunități</h2></div><button className="logoutBtn" onClick={signOut} title="Ieșire din cont"><span className="logoutText">Ieșire</span><span className="logoutIcon" aria-hidden="true">↪</span></button></div>
+    <aside id="group-menu" className={`side ${mobileMenuOpen ? "open" : ""}`}>
+      <div className="brandRow"><div><p className="eyebrow">eClinic</p><h2>Comunități</h2></div><div className="brandActions"><button className="logoutBtn" onClick={signOut} title="Ieșire din cont"><span className="logoutText">Ieșire</span><span className="logoutIcon" aria-hidden="true">↪</span></button><button className="mobileCloseBtn" onClick={() => setMobileMenuOpen(false)} aria-label="Închide meniul">×</button></div></div>
       <div className="communityNav">
         <div className="communityNavTitle"><strong>Comunități</strong>{isGeneralAdmin && <button title="Comunitate nouă" onClick={() => setCommunityModal(true)}>＋</button>}</div>
-        <button className={selectedCommunityId === "all" ? "selected" : ""} onClick={() => { setSelectedCommunityId("all"); setRoomId(null); }}>Toate grupurile</button>
-        <button className={selectedCommunityId === "private" ? "selected" : ""} onClick={() => { setSelectedCommunityId("private"); setRoomId(null); }}>Grupuri independente</button>
-        {communities.map((item) => <button key={item.id} className={selectedCommunityId === item.id ? "selected" : ""} onClick={() => { setSelectedCommunityId(item.id); setRoomId(null); }}>
+        <button className={selectedCommunityId === "all" ? "selected" : ""} onClick={() => chooseCommunity("all")}>Toate grupurile</button>
+        <button className={selectedCommunityId === "private" ? "selected" : ""} onClick={() => chooseCommunity("private")}>Grupuri independente</button>
+        {communities.map((item) => <button key={item.id} className={selectedCommunityId === item.id ? "selected" : ""} onClick={() => chooseCommunity(item.id)}>
           <span>◉</span><div><strong>{item.name}</strong><small>{item.group_count} grupuri · {item.member_count} membri</small></div>
         </button>)}
       </div>
@@ -690,15 +702,16 @@ function Chat({ session }) {
       <div className="conversationList">
         {loading && <p className="status">Se încarcă...</p>}
         {!loading && visibleRooms.length === 0 && <p className="emptySide">Nu ai grupuri în această secțiune.</p>}
-        {visibleRooms.map((item) => <button className={`conv ${item.id === roomId ? "active" : ""}`} key={item.id} onClick={() => setRoomId(item.id)}>
+        {visibleRooms.map((item) => <button className={`conv ${item.id === roomId ? "active" : ""}`} key={item.id} onClick={() => chooseRoom(item.id)}>
           <span>{item.title.slice(0, 2).toUpperCase()}</span><div><strong>{item.is_pinned && "📌 "}{item.title}</strong><small>{item.member_count} membri · {item.community_name || "independent"}</small></div>
           {!item.password_protected && item.unread_count > 0 && <i className="unreadBadge">{item.unread_count > 99 ? "99+" : item.unread_count}</i>}
         </button>)}
       </div>
       <div className="user"><strong>{session.user.email}</strong><small>{isGeneralAdmin ? "Administrator general" : "Conectat"}</small></div>
     </aside>
-    <section className="chat">
-      {room ? <><header><div><strong>{room.title}</strong><small>{room.member_count} membri · {room.community_name || "grup independent"} · numai membrii au acces</small></div><div className="headerActions"><b>● Privat</b><button onClick={toggleGroupPin}>{room.is_pinned ? "📌 Fixat" : "Fixează sus"}</button><button onClick={openSettings}>Gestionează</button></div></header>
+    {mobileMenuOpen && <button className="sideBackdrop" onClick={() => setMobileMenuOpen(false)} aria-label="Închide meniul" />}
+    <section className={`chat ${room ? "" : "chatEmpty"}`}>
+      {room ? <><header><button className="mobileMenuBtn" onClick={() => setMobileMenuOpen(true)} aria-controls="group-menu" aria-expanded={mobileMenuOpen}>☰</button><div className="headerMain"><strong>{room.title}</strong><small>{room.member_count} membri · {room.community_name || "grup independent"} · numai membrii au acces</small></div><div className="headerActions"><b>● Privat</b><button onClick={toggleGroupPin}>{room.is_pinned ? "📌 Fixat" : "Fixează sus"}</button><button onClick={openSettings}>Gestionează</button></div></header>
         <div className="warning">Versiune de test. Nu introduce date medicale sau personale reale.</div>
         <div className="msgs">
           {pinnedMessages.length > 0 && <div className="pinnedArea">
@@ -740,8 +753,8 @@ function Chat({ session }) {
           {emojiOpen && <div className="emojiPicker">{QUICK_EMOJIS.map((emoji) => <button type="button" key={emoji} onClick={() => insertEmoji(emoji)}>{emoji}</button>)}</div>}
           {attachment && <div className="selectedFile"><span>{attachment.name}</span><button type="button" onClick={() => { setAttachment(null); if (fileInput.current) fileInput.current.value = ""; }}>×</button></div>}
         </form></div></> :
-        <div className="welcome"><div className="logo">eC</div><h2>{selectedCommunity?.name || "Grupuri private"}</h2><p>{visibleRooms.length ? "Selectează un grup din listă pentru a-l deschide." : canCreateGroup ? "Poți crea primul grup din această secțiune." : "Nu există încă grupuri disponibile."}</p>
-          {!visibleRooms.length && canCreateGroup && <button className="primary" onClick={() => setModal(true)}>Creează primul grup</button>}{error && <p className="chatError">{error}</p>}</div>}
+        <><div className="mobileWelcomeBar"><button className="mobileMenuBtn" onClick={() => setMobileMenuOpen(true)} aria-controls="group-menu" aria-expanded={mobileMenuOpen}>☰ <span>Grupuri</span></button></div><div className="welcome"><div className="logo">eC</div><h2>{selectedCommunity?.name || "Grupuri private"}</h2><p>{visibleRooms.length ? "Selectează un grup din listă pentru a-l deschide." : canCreateGroup ? "Poți crea primul grup din această secțiune." : "Nu există încă grupuri disponibile."}</p>
+          {!visibleRooms.length && canCreateGroup && <button className="primary" onClick={() => setModal(true)}>Creează primul grup</button>}{error && <p className="chatError">{error}</p>}</div></>}
     </section>
     {modal && <NewConversation close={() => setModal(false)} communities={communities} selectedCommunityId={selectedCommunityId} isGeneralAdmin={isGeneralAdmin} created={(id) => { setModal(false); loadRooms(id); loadCommunities(); }} />}
     {communityModal && <NewCommunity close={() => setCommunityModal(false)} created={(id) => { setCommunityModal(false); loadCommunities(id); }} />}

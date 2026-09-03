@@ -1,4 +1,10 @@
-# eClinic Chat v1.2.1
+# eClinic Chat v1.3.0
+
+Versiunea v1.3 optimizează interfața pentru telefon: conversația folosește toată lățimea ecranului, lista de grupuri se deschide dintr-un meniu lateral, câmpurile nu mai declanșează mărirea automată pe iPhone, iar zona de scriere rămâne accesibilă în partea de jos.
+
+Pentru actualizarea de la v1.2.1 se publică numai fișierele aplicației. Nu este necesar niciun script SQL nou.
+
+## Actualizare de la v1.2
 
 Versiunea v1.2.1 păstrează explicit starea de recuperare în adresa aplicației, astfel încât linkul din email să deschidă întotdeauna formularul pentru alegerea parolei noi.
 
