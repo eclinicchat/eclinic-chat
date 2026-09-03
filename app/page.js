@@ -16,6 +16,7 @@ const REACTION_EMOJIS = ["👍", "❤️", "😂", "🤣", "😮", "😢", "👏
 
 function Login() {
   const [signup, setSignup] = useState(false);
+  const [forgotPassword, setForgotPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -36,20 +37,78 @@ function Login() {
     setBusy(false);
   }
 
+  async function sendResetLink(e) {
+    e.preventDefault();
+    if (!email || busy) return;
+    setBusy(true);
+    setNotice(null);
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo: window.location.origin,
+    });
+    if (error) setNotice({ error: true, text: error.message });
+    else setNotice({ text: "Dacă adresa are un cont, vei primi un email pentru alegerea unei parole noi." });
+    setBusy(false);
+  }
+
   return <main className="loginShell"><section className="loginCard">
     <div className="logo">eC</div><p className="eyebrow">eClinic Chat</p>
-    <h1>{signup ? "Creează cont" : "Conectare securizată"}</h1>
+    <h1>{forgotPassword ? "Recuperează parola" : signup ? "Creează cont" : "Conectare securizată"}</h1>
     <p className="muted">Conversațiile sunt vizibile numai membrilor adăugați.</p>
-    <form onSubmit={submit} className="form">
+    {forgotPassword ? <form onSubmit={sendResetLink} className="form">
+      <label>Email<input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+      {notice && <p className={notice.error ? "error" : "success"}>{notice.text}</p>}
+      <button disabled={busy} className="primary">{busy ? "Se trimite..." : "Trimite linkul de recuperare"}</button>
+    </form> : <form onSubmit={submit} className="form">
       <label>Email<input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
       <label>Parolă<input type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} /></label>
       {notice && <p className={notice.error ? "error" : "success"}>{notice.text}</p>}
       <button disabled={busy} className="primary">{busy ? "Se procesează..." : signup ? "Creează cont" : "Intră în aplicație"}</button>
-    </form>
-    <button className="linkBtn" onClick={() => { setSignup(!signup); setNotice(null); }}>
-      {signup ? "Ai deja cont? Conectează-te" : "Nu ai cont? Creează unul"}
+    </form>}
+    {!forgotPassword && !signup && <button className="linkBtn" onClick={() => { setForgotPassword(true); setNotice(null); }}>
+      Ai uitat parola?
+    </button>}
+    <button className="linkBtn" onClick={() => { setForgotPassword(false); setSignup(forgotPassword ? false : !signup); setNotice(null); }}>
+      {forgotPassword ? "Înapoi la conectare" : signup ? "Ai deja cont? Conectează-te" : "Nu ai cont? Creează unul"}
     </button>
     <p className="note">Versiune de test. Nu introduce date medicale reale.</p>
+  </section></main>;
+}
+
+function UpdatePassword({ completed }) {
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState(null);
+
+  async function submit(e) {
+    e.preventDefault();
+    setNotice(null);
+    if (password !== confirmPassword) {
+      setNotice({ error: true, text: "Parolele nu coincid." });
+      return;
+    }
+    setBusy(true);
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) setNotice({ error: true, text: error.message });
+    else {
+      setNotice({ text: "Parola a fost schimbată. Poți continua în aplicație." });
+      setPassword("");
+      setConfirmPassword("");
+      completed();
+    }
+    setBusy(false);
+  }
+
+  return <main className="loginShell"><section className="loginCard">
+    <div className="logo">eC</div><p className="eyebrow">eClinic Chat</p>
+    <h1>Alege o parolă nouă</h1>
+    <p className="muted">Folosește minimum 8 caractere și nu reutiliza o parolă veche.</p>
+    <form onSubmit={submit} className="form">
+      <label>Parola nouă<input type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+      <label>Confirmă parola<input type="password" required minLength={8} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} /></label>
+      {notice && <p className={notice.error ? "error" : "success"}>{notice.text}</p>}
+      <button className="primary" disabled={busy || password.length < 8 || confirmPassword.length < 8}>{busy ? "Se salvează..." : "Salvează parola nouă"}</button>
+    </form>
   </section></main>;
 }
 
@@ -751,11 +810,17 @@ function Chat({ session }) {
 export default function Home() {
   const [session, setSession] = useState(null);
   const [checking, setChecking] = useState(true);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setChecking(false); });
-    const { data } = supabase.auth.onAuthStateChange((_event, next) => { setSession(next); setChecking(false); });
+    const { data } = supabase.auth.onAuthStateChange((event, next) => {
+      if (event === "PASSWORD_RECOVERY") setPasswordRecovery(true);
+      setSession(next);
+      setChecking(false);
+    });
     return () => data.subscription.unsubscribe();
   }, []);
   if (checking) return <main className="center">Se verifică sesiunea...</main>;
+  if (passwordRecovery && session) return <UpdatePassword completed={() => setPasswordRecovery(false)} />;
   return session ? <Chat session={session} /> : <Login />;
 }

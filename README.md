@@ -1,4 +1,11 @@
-# eClinic Chat v1.1
+# eClinic Chat v1.2
+
+## Actualizare de securitate de la v1.1
+
+1. Rulează integral, o singură dată, fișierul `supabase-security-v1.2.sql` în Supabase.
+2. Publică fișierele actualizate ale aplicației prin GitHub și Vercel.
+
+Versiunea v1.2 adaugă recuperarea parolei contului, fixează identitatea expeditorului pe server, validează imaginile și cere deblocarea grupului înaintea operațiilor administrative. De asemenea, adaugă antete de securitate pentru aplicația web.
 
 ## Actualizare de securitate de la v1.0
 
