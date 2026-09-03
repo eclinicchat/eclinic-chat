@@ -1,4 +1,6 @@
-# eClinic Chat v1.2
+# eClinic Chat v1.2.1
+
+Versiunea v1.2.1 păstrează explicit starea de recuperare în adresa aplicației, astfel încât linkul din email să deschidă întotdeauna formularul pentru alegerea parolei noi.
 
 ## Actualizare de securitate de la v1.1
 

@@ -43,7 +43,7 @@ function Login() {
     setBusy(true);
     setNotice(null);
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-      redirectTo: window.location.origin,
+      redirectTo: `${window.location.origin}/?recovery=1`,
     });
     if (error) setNotice({ error: true, text: error.message });
     else setNotice({ text: "Dacă adresa are un cont, vei primi un email pentru alegerea unei parole noi." });
@@ -812,6 +812,9 @@ export default function Home() {
   const [checking, setChecking] = useState(true);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("recovery") === "1") {
+      setPasswordRecovery(true);
+    }
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setChecking(false); });
     const { data } = supabase.auth.onAuthStateChange((event, next) => {
       if (event === "PASSWORD_RECOVERY") setPasswordRecovery(true);
@@ -821,6 +824,9 @@ export default function Home() {
     return () => data.subscription.unsubscribe();
   }, []);
   if (checking) return <main className="center">Se verifică sesiunea...</main>;
-  if (passwordRecovery && session) return <UpdatePassword completed={() => setPasswordRecovery(false)} />;
+  if (passwordRecovery && session) return <UpdatePassword completed={() => {
+    window.history.replaceState({}, "", "/");
+    setPasswordRecovery(false);
+  }} />;
   return session ? <Chat session={session} /> : <Login />;
 }
