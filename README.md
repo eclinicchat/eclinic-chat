@@ -1,6 +1,8 @@
-# eClinic Chat v0.9
+# eClinic Chat v0.9.1
 
 MVP cu autentificare Supabase, conversații private și trimitere de imagini de maximum 10 MB, vizibile numai membrilor. Include administratori multipli, parolă suplimentară opțională, reply la text și imagini, emoticoane, reacții, pin și contoare de necitite.
+
+Actualizarea v0.9.1 mărește comenzile pentru răspuns, reacții și pin, extinde selecția de emoticoane și permite alegerea oricărui mesaj din lista mesajelor fixate. Nu necesită un script SQL nou dacă v0.9 este deja instalată.
 
 1. Pentru actualizarea de la v0.8.1, rulează numai `supabase-messaging-v0.9.sql` în Supabase SQL Editor.
 2. Pentru o instalare nouă, rulează în ordine `supabase-private-chat.sql`, `supabase-chat-images.sql`, `supabase-conversation-management.sql` și `supabase-messaging-v0.9.sql`.

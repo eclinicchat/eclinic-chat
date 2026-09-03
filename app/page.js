@@ -6,8 +6,13 @@ import { supabase } from "../lib/supabase";
 const time = (value) => new Date(value).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" });
 const INACTIVITY_MS = 15 * 60 * 1000;
 const WARNING_MS = 60 * 1000;
-const QUICK_EMOJIS = ["😀", "😂", "😍", "👍", "❤️", "🙏", "🎉", "✅"];
-const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+const QUICK_EMOJIS = [
+  "😀", "😃", "😄", "😁", "😂", "🤣", "😊", "😍", "🥰", "😘",
+  "😎", "🤩", "🤔", "🙄", "😮", "😢", "😭", "😡", "🤗", "🤝",
+  "👍", "👎", "👏", "🙌", "🙏", "💪", "❤️", "💙", "💚", "🔥",
+  "🎉", "✅", "❌", "⚠️", "📌", "💡", "👀", "💯", "🚑", "🏥",
+];
+const REACTION_EMOJIS = ["👍", "❤️", "😂", "🤣", "😮", "😢", "👏", "🙏", "🔥", "✅", "👀", "💯"];
 
 function Login() {
   const [signup, setSignup] = useState(false);
@@ -91,6 +96,7 @@ function Chat({ session }) {
   const [replyTo, setReplyTo] = useState(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [reactionTarget, setReactionTarget] = useState(null);
+  const [pinnedOpen, setPinnedOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [attachment, setAttachment] = useState(null);
@@ -309,6 +315,7 @@ function Chat({ session }) {
   }
 
   function scrollToMessage(messageId) {
+    setPinnedOpen(false);
     messageRefs.current[messageId]?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
@@ -479,7 +486,16 @@ function Chat({ session }) {
       {room ? <><header><div><strong>{room.title}</strong><small>{room.member_count} membri · numai membrii au acces</small></div><div className="headerActions"><b>● Privat</b><button onClick={toggleGroupPin}>{room.is_pinned ? "📌 Fixat" : "Fixează sus"}</button><button onClick={openSettings}>Gestionează</button></div></header>
         <div className="warning">Versiune de test. Nu introduce date medicale sau personale reale.</div>
         <div className="msgs">
-          {pinnedMessages.length > 0 && <button className="pinnedBanner" onClick={() => scrollToMessage(pinnedMessages[0].id)}>📌 {pinnedMessages.length} {pinnedMessages.length === 1 ? "mesaj fixat" : "mesaje fixate"} · {pinnedMessages[0].body || pinnedMessages[0].attachment_name || "Imagine"}</button>}
+          {pinnedMessages.length > 0 && <div className="pinnedArea">
+            <button className="pinnedBanner" onClick={() => pinnedMessages.length === 1 ? scrollToMessage(pinnedMessages[0].id) : setPinnedOpen(!pinnedOpen)}>
+              <span className="largePin">📌</span><span>{pinnedMessages.length} {pinnedMessages.length === 1 ? "mesaj fixat" : "mesaje fixate"}</span><span className="pinChevron">{pinnedMessages.length > 1 ? (pinnedOpen ? "▲" : "▼") : "›"}</span>
+            </button>
+            {pinnedOpen && pinnedMessages.length > 1 && <div className="pinnedList">
+              {pinnedMessages.map((item, index) => <button key={item.id} onClick={() => scrollToMessage(item.id)}>
+                <span>📌</span><div><strong>Mesaj fixat {index + 1}</strong><small>{item.body || (item.attachment_path ? "📷 Imagine" : item.attachment_name || "Mesaj")}</small></div>
+              </button>)}
+            </div>}
+          </div>}
           {messages.length === 0 && !error && <p className="status">Trimite primul mesaj.</p>}
           {messages.map((item) => { const mine = item.user_id === session.user.id; const replied = messages.find((x) => x.id === item.reply_to_id); const itemReactions = groupedReactions(item.id); return <div ref={(node) => { messageRefs.current[item.id] = node; }} key={item.id} className={`messageWrap ${mine ? "mine" : ""}`}>
             <div className={`bubble ${mine ? "mine" : ""} ${item.attachment_path ? "hasImage" : ""} ${item.pinned_at ? "pinnedMessage" : ""}`}>
@@ -493,8 +509,8 @@ function Chat({ session }) {
               {item.attachment_path && !imageUrls[item.attachment_path] && <p className="imageLoading">Se încarcă imaginea...</p>}
               {item.body && <p>{item.body}</p>}<small>{time(item.created_at)}</small>
             </div>
-            <div className="messageActions"><button onClick={() => setReplyTo(item)}>↩ Răspunde</button><button onClick={() => setReactionTarget(reactionTarget === item.id ? null : item.id)}>☺</button>
-              {room.my_is_admin && <button onClick={() => toggleMessagePin(item.id)}>{item.pinned_at ? "Anulează pin" : "📌 Pin"}</button>}</div>
+            <div className="messageActions"><button onClick={() => setReplyTo(item)}><span>↩</span> Răspunde</button><button onClick={() => setReactionTarget(reactionTarget === item.id ? null : item.id)}><span>☺</span> Reacție</button>
+              {room.my_is_admin && <button onClick={() => toggleMessagePin(item.id)}><span>📌</span> {item.pinned_at ? "Anulează pin" : "Pin"}</button>}</div>
             {reactionTarget === item.id && <div className="reactionPicker">{REACTION_EMOJIS.map((emoji) => <button key={emoji} onClick={() => reactToMessage(item.id, emoji)}>{emoji}</button>)}</div>}
             {Object.keys(itemReactions).length > 0 && <div className="reactionSummary">{Object.entries(itemReactions).map(([emoji, info]) => <button className={info.mine ? "mine" : ""} key={emoji} onClick={() => reactToMessage(item.id, emoji)}>{emoji} {info.count}</button>)}</div>}
           </div>; })}<div ref={bottom} />
