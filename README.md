@@ -1,4 +1,13 @@
-# eClinic Chat v1.3.0
+# eClinic Chat v1.4.0
+
+Versiunea v1.4 adaugă ștergerea securizată a mesajelor. Autorul își poate șterge propriile mesaje, iar administratorii grupului pot elimina orice mesaj. Conținutul, imaginea, reacțiile și fixarea sunt eliminate, acțiunea este jurnalizată, iar în conversație rămâne marcajul neutru „Mesaj șters”.
+
+Pentru actualizarea de la v1.3:
+
+1. Rulează integral, o singură dată, fișierul `supabase-message-deletion-v1.4.sql` în Supabase.
+2. Publică fișierele actualizate ale aplicației prin GitHub și Vercel.
+
+## Actualizare de la v1.2.1
 
 Versiunea v1.3 optimizează interfața pentru telefon: conversația folosește toată lățimea ecranului, lista de grupuri se deschide dintr-un meniu lateral, câmpurile nu mai declanșează mărirea automată pe iPhone, iar zona de scriere rămâne accesibilă în partea de jos.
 
@@ -42,6 +51,9 @@ Rulează în această ordine:
 3. `supabase-conversation-management.sql`
 4. `supabase-messaging-v0.9.sql`
 5. `supabase-communities-v1.0.sql`
+6. `supabase-security-v1.1.sql`
+7. `supabase-security-v1.2.sql`
+8. `supabase-message-deletion-v1.4.sql`
 
 În Vercel trebuie păstrate variabilele `NEXT_PUBLIC_SUPABASE_URL` și `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 

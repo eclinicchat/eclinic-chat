@@ -204,6 +204,7 @@ function Chat({ session }) {
   const [pinnedOpen, setPinnedOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [deletingMessageId, setDeletingMessageId] = useState(null);
   const [attachment, setAttachment] = useState(null);
   const [imageUrls, setImageUrls] = useState({});
   const [error, setError] = useState("");
@@ -453,6 +454,60 @@ function Chat({ session }) {
   async function toggleMessagePin(messageId) {
     const { error: pinError } = await supabase.rpc("toggle_message_pin", { target_message_id: messageId });
     if (pinError) setError(pinError.message);
+  }
+
+  async function deleteMessage(item) {
+    if (deletingMessageId || item.deleted_at) return;
+    const ownMessage = item.user_id === session.user.id;
+    const question = ownMessage
+      ? "Ștergi acest mesaj? Acțiunea nu poate fi anulată."
+      : "Ștergi mesajul acestui membru? Acțiunea va fi înregistrată.";
+    if (!window.confirm(question)) return;
+
+    setDeletingMessageId(item.id);
+    setError("");
+
+    if (item.attachment_path) {
+      const { error: imageDeleteError } = await supabase.storage.from("chat-images").remove([item.attachment_path]);
+      if (imageDeleteError) {
+        setError("Imaginea nu a putut fi ștearsă. Mesajul a fost păstrat.");
+        setDeletingMessageId(null);
+        return;
+      }
+    }
+
+    const { error: deleteError } = await supabase.rpc("delete_private_message", {
+      target_message_id: item.id,
+    });
+    if (deleteError) {
+      setError("Mesajul nu a putut fi șters complet. Încearcă din nou.");
+      setDeletingMessageId(null);
+      return;
+    }
+
+    setMessages((current) => current.map((message) => message.id === item.id ? {
+      ...message,
+      body: null,
+      attachment_path: null,
+      attachment_name: null,
+      attachment_type: null,
+      attachment_size: null,
+      reply_to_id: null,
+      pinned_at: null,
+      pinned_by: null,
+      deleted_at: new Date().toISOString(),
+      deleted_by: session.user.id,
+    } : message));
+    setReactions((current) => current.filter((reaction) => reaction.message_id !== item.id));
+    if (replyTo?.id === item.id) setReplyTo(null);
+    if (item.attachment_path) {
+      setImageUrls((current) => {
+        const next = { ...current };
+        delete next[item.attachment_path];
+        return next;
+      });
+    }
+    setDeletingMessageId(null);
   }
 
   async function toggleGroupPin() {
@@ -726,21 +781,24 @@ function Chat({ session }) {
           </div>}
           {messages.length === 0 && !error && <p className="status">Trimite primul mesaj.</p>}
           {messages.map((item) => { const mine = item.user_id === session.user.id; const replied = messages.find((x) => x.id === item.reply_to_id); const itemReactions = groupedReactions(item.id); return <div ref={(node) => { messageRefs.current[item.id] = node; }} key={item.id} className={`messageWrap ${mine ? "mine" : ""}`}>
-            <div className={`bubble ${mine ? "mine" : ""} ${item.attachment_path ? "hasImage" : ""} ${item.pinned_at ? "pinnedMessage" : ""}`}>
-              {!mine && <strong className="sender">{item.sender_email || "Utilizator"}</strong>}
-              {item.pinned_at && <span className="pinMark">📌</span>}
-              {item.reply_to_id && <button className="replyQuote" onClick={() => scrollToMessage(item.reply_to_id)}>
-                <strong>{replied?.sender_email || "Mesaj anterior"}</strong><span>{replied?.body || (replied?.attachment_path ? "📷 Imagine" : "Mesaj indisponibil")}</span>
-                {replied?.attachment_path && imageUrls[replied.attachment_path] && <img src={imageUrls[replied.attachment_path]} alt="Imagine citată" />}
-              </button>}
-              {item.attachment_path && imageUrls[item.attachment_path] && <a href={imageUrls[item.attachment_path]} target="_blank" rel="noreferrer"><img className="chatImage" src={imageUrls[item.attachment_path]} alt={item.attachment_name || "Imagine atașată"} /></a>}
-              {item.attachment_path && !imageUrls[item.attachment_path] && <p className="imageLoading">Se încarcă imaginea...</p>}
-              {item.body && <p>{item.body}</p>}<small>{time(item.created_at)}</small>
+            <div className={`bubble ${mine ? "mine" : ""} ${item.attachment_path ? "hasImage" : ""} ${item.pinned_at ? "pinnedMessage" : ""} ${item.deleted_at ? "deletedMessage" : ""}`}>
+              {item.deleted_at ? <p className="deletedText">Mesaj șters</p> : <>
+                {!mine && <strong className="sender">{item.sender_email || "Utilizator"}</strong>}
+                {item.pinned_at && <span className="pinMark">📌</span>}
+                {item.reply_to_id && <button className="replyQuote" onClick={() => scrollToMessage(item.reply_to_id)}>
+                  <strong>{replied?.sender_email || "Mesaj anterior"}</strong><span>{replied?.deleted_at ? "Mesaj șters" : replied?.body || (replied?.attachment_path ? "📷 Imagine" : "Mesaj indisponibil")}</span>
+                  {!replied?.deleted_at && replied?.attachment_path && imageUrls[replied.attachment_path] && <img src={imageUrls[replied.attachment_path]} alt="Imagine citată" />}
+                </button>}
+                {item.attachment_path && imageUrls[item.attachment_path] && <a href={imageUrls[item.attachment_path]} target="_blank" rel="noreferrer"><img className="chatImage" src={imageUrls[item.attachment_path]} alt={item.attachment_name || "Imagine atașată"} /></a>}
+                {item.attachment_path && !imageUrls[item.attachment_path] && <p className="imageLoading">Se încarcă imaginea...</p>}
+                {item.body && <p>{item.body}</p>}
+              </>}<small>{time(item.created_at)}</small>
             </div>
-            <div className="messageActions"><button onClick={() => setReplyTo(item)}><span>↩</span> Răspunde</button><button onClick={() => setReactionTarget(reactionTarget === item.id ? null : item.id)}><span>☺</span> Reacție</button>
-              {room.my_is_admin && <button onClick={() => toggleMessagePin(item.id)}><span>📌</span> {item.pinned_at ? "Anulează pin" : "Pin"}</button>}</div>
-            {reactionTarget === item.id && <div className="reactionPicker">{REACTION_EMOJIS.map((emoji) => <button key={emoji} onClick={() => reactToMessage(item.id, emoji)}>{emoji}</button>)}</div>}
-            {Object.keys(itemReactions).length > 0 && <div className="reactionSummary">{Object.entries(itemReactions).map(([emoji, info]) => <button className={info.mine ? "mine" : ""} key={emoji} onClick={() => reactToMessage(item.id, emoji)}>{emoji} {info.count}</button>)}</div>}
+            {!item.deleted_at && <div className="messageActions"><button onClick={() => setReplyTo(item)}><span>↩</span> Răspunde</button><button onClick={() => setReactionTarget(reactionTarget === item.id ? null : item.id)}><span>☺</span> Reacție</button>
+              {room.my_is_admin && <button onClick={() => toggleMessagePin(item.id)}><span>📌</span> {item.pinned_at ? "Anulează pin" : "Pin"}</button>}
+              {(mine || room.my_is_admin) && <button className="deleteMessageBtn" disabled={deletingMessageId === item.id} onClick={() => deleteMessage(item)}><span>🗑</span> {deletingMessageId === item.id ? "Se șterge..." : "Șterge"}</button>}</div>}
+            {!item.deleted_at && reactionTarget === item.id && <div className="reactionPicker">{REACTION_EMOJIS.map((emoji) => <button key={emoji} onClick={() => reactToMessage(item.id, emoji)}>{emoji}</button>)}</div>}
+            {!item.deleted_at && Object.keys(itemReactions).length > 0 && <div className="reactionSummary">{Object.entries(itemReactions).map(([emoji, info]) => <button className={info.mine ? "mine" : ""} key={emoji} onClick={() => reactToMessage(item.id, emoji)}>{emoji} {info.count}</button>)}</div>}
           </div>; })}<div ref={bottom} />
         </div>
         <div>{error && <p className="chatError">{error}</p>}<form className="composer" onSubmit={send}>
