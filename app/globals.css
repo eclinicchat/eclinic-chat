@@ -30,3 +30,20 @@
   .modalBackdrop{padding:12px}.modal{padding:20px;max-height:calc(100dvh - 24px);overflow-y:auto}.inlineForm{grid-template-columns:1fr}.inlineForm button{width:100%}.memberRow{align-items:flex-start;flex-direction:column}.memberActions{width:100%}.memberActions button{flex:1}.passwordActions{flex-direction:column}.timeoutModal .modalActions{flex-direction:column-reverse}.timeoutModal .modalActions button{width:100%}
 }
 .messageActions .deleteMessageBtn{color:#ffb8c1;border-color:#713440;background:#311923}.deletedMessage,.bubble.mine.deletedMessage{background:#0d1825;border-color:#263548;color:#8391a3;box-shadow:none}.deletedText{font-style:italic;margin:2px 0}
+
+.messageLink{
+  color:#9ed5ff;
+  text-decoration:underline;
+  text-decoration-thickness:1px;
+  text-underline-offset:3px;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+  cursor:pointer;
+  pointer-events:auto;
+  position:relative;
+  z-index:3;
+}
+
+.bubble.mine .messageLink{
+  color:#fff;
+}
