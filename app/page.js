@@ -13,7 +13,28 @@ const QUICK_EMOJIS = [
   "🎉", "✅", "❌", "⚠️", "📌", "💡", "👀", "💯", "🚑", "🏥",
 ];
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "🤣", "😮", "😢", "👏", "🙏", "🔥", "✅", "👀", "💯"];
+function LinkifiedText({ text }) {
+  return text.split(/(https?:\/\/[^\s]+)/gi).map((part, index) => {
+    if (!/^https?:\/\//i.test(part)) return part;
 
+    return (
+      <a
+        className="messageLink"
+        href={part}
+        target="_blank"
+        rel="noopener noreferrer nofollow"
+        key={`${part}-${index}`}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          window.open(part, "_blank", "noopener,noreferrer");
+        }}
+      >
+        {part}
+      </a>
+    );
+  });
+}
 function Login() {
   const [signup, setSignup] = useState(false);
   const [forgotPassword, setForgotPassword] = useState(false);
@@ -791,7 +812,7 @@ function Chat({ session }) {
                 </button>}
                 {item.attachment_path && imageUrls[item.attachment_path] && <a href={imageUrls[item.attachment_path]} target="_blank" rel="noreferrer"><img className="chatImage" src={imageUrls[item.attachment_path]} alt={item.attachment_name || "Imagine atașată"} /></a>}
                 {item.attachment_path && !imageUrls[item.attachment_path] && <p className="imageLoading">Se încarcă imaginea...</p>}
-                {item.body && <p>{item.body}</p>}
+                {item.body && <p><LinkifiedText text={item.body} /></p>}
               </>}<small>{time(item.created_at)}</small>
             </div>
             {!item.deleted_at && <div className="messageActions"><button onClick={() => setReplyTo(item)}><span>↩</span> Răspunde</button><button onClick={() => setReactionTarget(reactionTarget === item.id ? null : item.id)}><span>☺</span> Reacție</button>
