@@ -15,15 +15,15 @@
 .logoutIcon,.mobileMenuBtn,.mobileCloseBtn,.sideBackdrop,.mobileWelcomeBar{display:none}.timeoutModal h2{margin-bottom:12px}.chatEmpty{grid-template-rows:1fr}
 @media(max-width:760px){
   input,textarea,select{font-size:16px}
-  .app{display:block;position:relative;width:100%;max-width:100vw;height:100dvh;overflow:hidden}
-  .side{position:fixed;inset:0 auto 0 0;z-index:30;width:min(88vw,340px);padding:18px 16px max(14px,env(safe-area-inset-bottom));transform:translateX(-105%);transition:transform .2s ease;box-shadow:16px 0 48px #000a}
+  .app{display:block;position:relative;width:100%;max-width:100vw;height:100dvh;padding-top:env(safe-area-inset-top);overflow:hidden}
+  .side{position:fixed;inset:0 auto 0 0;z-index:30;width:min(88vw,340px);padding:max(18px,calc(env(safe-area-inset-top) + 8px)) 16px max(14px,env(safe-area-inset-bottom));transform:translateX(-105%);transition:transform .2s ease;box-shadow:16px 0 48px #000a}
   .side.open{transform:translateX(0)}
   .sideBackdrop{display:block;position:fixed;inset:0;z-index:20;border:0;border-radius:0;padding:0;background:#02070dbb}
   .brandRow{padding:0 2px 12px}.brandActions{gap:8px}.mobileCloseBtn{display:grid;width:42px;height:42px;place-items:center;padding:0;font-size:28px;background:transparent}
   .logoutBtn{display:grid;min-width:42px;height:42px;place-items:center;padding:0}.logoutText{display:none}.logoutIcon{display:inline;font-size:22px}
   .communityNav{max-height:32vh}.communityNavTitle strong{display:block}.communityNavTitle{justify-content:space-between}.communityNav>button{justify-content:flex-start;text-align:left;padding:10px 9px;font-size:14px}.communityNav>button>div{display:block}.communityNav>button>span{font-size:16px}.manageCommunityBtn{font-size:12px;padding:9px}.newBtn,.user{display:block}
   .conversationList{padding-top:8px}.conv{justify-content:flex-start;padding:10px;position:relative}.conv>span{flex-basis:46px;height:46px}.conv div{display:block}.unreadBadge{position:static;min-width:22px;height:22px;padding:0 6px}
-  .chat{width:100%;max-width:100vw;height:100dvh;grid-template-rows:auto auto minmax(0,1fr) auto}.chatEmpty{grid-template-rows:auto minmax(0,1fr)}
+  .chat{width:100%;max-width:100vw;height:100%;grid-template-rows:auto auto minmax(0,1fr) auto}.chatEmpty{grid-template-rows:auto minmax(0,1fr)}
   header{display:grid;grid-template-columns:44px minmax(0,1fr);align-items:center;gap:7px 10px;min-height:auto;padding:8px 10px}.mobileMenuBtn{display:flex;align-items:center;justify-content:center;gap:7px;width:44px;height:44px;padding:0;font-size:22px}.headerMain{min-width:0}.headerMain strong,.headerMain small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.headerActions{grid-column:1/-1;gap:6px;justify-content:flex-end;flex-wrap:nowrap;overflow-x:auto}.headerActions b{display:none}.headerActions button{font-size:12px;padding:7px 9px;white-space:nowrap}
   .mobileWelcomeBar{display:flex;align-items:center;padding:10px;border-bottom:1px solid var(--line);background:var(--panel)}.mobileWelcomeBar .mobileMenuBtn{width:auto;padding:0 12px;font-size:16px}
   .warning{padding:6px 10px;font-size:11px}.msgs{max-width:100vw;padding:14px 10px;overscroll-behavior:contain}.messageWrap{max-width:94%}.messageActions{opacity:1;flex-wrap:wrap}.messageActions button{font-size:11px;padding:6px 8px}.messageActions button span{font-size:17px}.pinnedArea{top:-8px;width:100%}.chatImage{max-height:55vh}
