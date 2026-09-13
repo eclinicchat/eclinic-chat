@@ -11,6 +11,7 @@
 .composer{padding:17px 24px;border-top:1px solid var(--line);display:grid;grid-template-columns:auto auto 1fr auto;gap:10px;background:var(--panel);position:relative}.fileInput{display:none}.attachBtn,.emojiBtn{width:46px;font-size:23px;padding:0}.selectedFile,.selectedReply{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px;color:#cbd5e2;font-size:12px;background:#13253a;border:1px solid var(--line);border-radius:10px;padding:7px 10px}.selectedFile span,.selectedReply span,.selectedReply strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.selectedFile button,.selectedReply button{border:0;background:transparent;padding:0 4px;font-size:18px}.selectedReply>div{min-width:0;flex:1}.selectedReply img{width:42px;height:42px;object-fit:cover;border-radius:6px}.emojiPicker{position:absolute;left:74px;bottom:68px;width:min(390px,calc(100vw - 120px));max-height:250px;overflow-y:auto}.chatImage{display:block;max-width:min(420px,100%);max-height:420px;object-fit:contain;border-radius:12px;margin:0 0 5px;background:#050b13}.imageLoading{color:var(--muted);font-size:12px}.chatError{margin:0;padding:7px 24px;background:#5b1725;font-size:13px}.welcome{place-self:center;text-align:center;padding:30px;color:var(--muted)}.welcome .logo{margin:0 auto 20px}.welcome h2{color:var(--text)}
 .modalBackdrop{position:fixed;inset:0;z-index:10;background:#02070dbb;display:grid;place-items:center;padding:20px}.modal{width:min(520px,100%);background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:24px;box-shadow:0 24px 90px #000a}.modalTitle{display:flex;align-items:flex-start;justify-content:space-between}.modalTitle h2{margin:0}.modalTitle .eyebrow{margin-top:0}.iconBtn{font-size:22px;background:transparent;border:0;padding:0 6px}.helper{font-size:12px;margin:-8px 0 0}.modalActions{display:flex;justify-content:flex-end;gap:10px}
 .manageModal{max-height:min(760px,92vh);overflow-y:auto}.manageSection{border-top:1px solid var(--line);margin-top:20px;padding-top:18px;display:grid;gap:12px}.inlineForm{display:grid;grid-template-columns:1fr auto;gap:8px}.sectionHeading{display:flex;align-items:center;justify-content:space-between}.sectionHeading small{color:var(--muted)}.memberList{display:grid;gap:8px}.memberRow{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#101f31;border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:0}.memberRow>div:first-child{min-width:0}.memberRow strong,.memberRow small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.memberRow small{color:var(--muted);font-size:11px;margin-top:3px}.memberActions{display:flex;gap:6px;flex:0 0 auto}.memberRow button{padding:7px 9px;font-size:12px}.passwordActions{display:flex;gap:8px;flex-wrap:wrap}.lockMark{width:54px;height:54px;border-radius:17px;display:grid;place-items:center;background:#17304d;font-size:25px;margin-bottom:14px}.passwordModal{width:min(440px,100%)}.passwordModal .eyebrow{margin-top:0}.manageError{margin:14px 0 0}.dangerZone{border-top:1px solid #5a2730;margin-top:20px;padding-top:18px}.dangerBtn{border-color:#853644;background:#441923;color:#ffb6c0}
+.checkLabel{display:flex;grid-template-columns:none;align-items:center;gap:9px}.checkLabel input{width:18px;height:18px;flex:0 0 auto}.notificationActions{flex-wrap:wrap}.notificationActions button{flex:1;white-space:nowrap}
 .logoutIcon,.mobileMenuBtn,.mobileCloseBtn,.sideBackdrop,.mobileWelcomeBar{display:none}.timeoutModal h2{margin-bottom:12px}.chatEmpty{grid-template-rows:1fr}
 @media(max-width:760px){
   input,textarea,select{font-size:16px}
@@ -30,20 +31,4 @@
   .modalBackdrop{padding:12px}.modal{padding:20px;max-height:calc(100dvh - 24px);overflow-y:auto}.inlineForm{grid-template-columns:1fr}.inlineForm button{width:100%}.memberRow{align-items:flex-start;flex-direction:column}.memberActions{width:100%}.memberActions button{flex:1}.passwordActions{flex-direction:column}.timeoutModal .modalActions{flex-direction:column-reverse}.timeoutModal .modalActions button{width:100%}
 }
 .messageActions .deleteMessageBtn{color:#ffb8c1;border-color:#713440;background:#311923}.deletedMessage,.bubble.mine.deletedMessage{background:#0d1825;border-color:#263548;color:#8391a3;box-shadow:none}.deletedText{font-style:italic;margin:2px 0}
-
-.messageLink{
-  color:#9ed5ff;
-  text-decoration:underline;
-  text-decoration-thickness:1px;
-  text-underline-offset:3px;
-  overflow-wrap:anywhere;
-  word-break:break-word;
-  cursor:pointer;
-  pointer-events:auto;
-  position:relative;
-  z-index:3;
-}
-
-.bubble.mine .messageLink{
-  color:#fff;
-}
+.messageLink{color:#9ed5ff;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;overflow-wrap:anywhere}.bubble.mine .messageLink{color:#fff}

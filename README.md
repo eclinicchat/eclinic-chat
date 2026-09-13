@@ -1,4 +1,32 @@
-# eClinic Chat v1.4.0
+# eClinic Chat v1.6.0
+
+Versiunea v1.6 adaugă notificări Web Push reale, instalare PWA pe Mac/iPhone și preferințe individuale pe grup. Notificarea afișează doar numele grupului și textul generic „Ai primit un mesaj nou”, fără conținutul conversației.
+
+## Actualizare de la v1.5
+
+1. Rulează integral, o singură dată, fișierul `supabase-push-notifications-v1.6.sql` în Supabase.
+2. Încarcă în GitHub toate fișierele aplicației din această versiune.
+3. În Vercel adaugă variabilele:
+   - `SUPABASE_SERVICE_ROLE_KEY` — cheia `service_role` din Supabase; este secretă și nu se introduce în GitHub.
+   - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` — cheia publică Web Push.
+   - `VAPID_PRIVATE_KEY` — cheia privată Web Push; este secretă și nu se introduce în GitHub.
+4. După redeploy, deschide **Gestionează → Notificări → Activează notificările pe acest dispozitiv**.
+
+Pe iPhone, notificările Web Push funcționează după instalarea aplicației pe ecranul principal: Safari → Partajare → Adaugă la ecranul principal. Apoi aplicația se deschide din pictograma eClinic Chat, iar notificările se activează din meniul grupului.
+
+La ieșirea explicită din cont, abonamentul push al dispozitivului este eliminat pentru protejarea confidențialității. Pentru a primi din nou notificări după autentificare, acestea se reactivează din meniul grupului.
+
+## Versiunea v1.5
+
+Versiunea v1.5 adaugă preferințe individuale pentru notificări pe grup: activare/dezactivare, sunet, numai mențiuni și suspendare temporară pentru 1 sau 8 ore.
+
+## Versiunea v1.4.1
+
+Versiunea v1.4.1 transformă automat adresele web `http://` și `https://` din mesaje în linkuri apăsabile, care se deschid într-o filă nouă. Actualizarea nu necesită niciun script SQL nou.
+
+Pentru actualizarea de la v1.4 se publică numai fișierele aplicației prin GitHub și Vercel.
+
+## Actualizare de la v1.3
 
 Versiunea v1.4 adaugă ștergerea securizată a mesajelor. Autorul își poate șterge propriile mesaje, iar administratorii grupului pot elimina orice mesaj. Conținutul, imaginea, reacțiile și fixarea sunt eliminate, acțiunea este jurnalizată, iar în conversație rămâne marcajul neutru „Mesaj șters”.
 
@@ -54,8 +82,9 @@ Rulează în această ordine:
 6. `supabase-security-v1.1.sql`
 7. `supabase-security-v1.2.sql`
 8. `supabase-message-deletion-v1.4.sql`
+9. `supabase-push-notifications-v1.6.sql`
 
-În Vercel trebuie păstrate variabilele `NEXT_PUBLIC_SUPABASE_URL` și `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+În Vercel trebuie configurate variabilele `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY` și `VAPID_PRIVATE_KEY`.
 
 ## Reguli de acces
 

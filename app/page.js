@@ -13,28 +13,32 @@ const QUICK_EMOJIS = [
   "🎉", "✅", "❌", "⚠️", "📌", "💡", "👀", "💯", "🚑", "🏥",
 ];
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "🤣", "😮", "😢", "👏", "🙏", "🔥", "✅", "👀", "💯"];
+
 function LinkifiedText({ text }) {
   return text.split(/(https?:\/\/[^\s]+)/gi).map((part, index) => {
     if (!/^https?:\/\//i.test(part)) return part;
-
-    return (
-      <a
-        className="messageLink"
-        href={part}
-        target="_blank"
-        rel="noopener noreferrer nofollow"
-        key={`${part}-${index}`}
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          window.open(part, "_blank", "noopener,noreferrer");
-        }}
-      >
-        {part}
-      </a>
-    );
+    return <a
+      className="messageLink"
+      href={part}
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+      key={`${part}-${index}`}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        window.open(part, "_blank", "noopener,noreferrer");
+      }}
+    >{part}</a>;
   });
 }
+
+function urlBase64ToUint8Array(value) {
+  const padding = "=".repeat((4 - (value.length % 4)) % 4);
+  const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = window.atob(base64);
+  return Uint8Array.from([...raw].map((character) => character.charCodeAt(0)));
+}
+
 function Login() {
   const [signup, setSignup] = useState(false);
   const [forgotPassword, setForgotPassword] = useState(false);
@@ -242,11 +246,12 @@ function Chat({ session }) {
   const [passwordError, setPasswordError] = useState("");
   const [groupPassword, setGroupPassword] = useState("");
   const [passwordProtected, setPasswordProtected] = useState(false);
-    const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [mentionsOnly, setMentionsOnly] = useState(false);
   const [mutedUntil, setMutedUntil] = useState("");
   const [notificationBusy, setNotificationBusy] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
   const [logoutWarning, setLogoutWarning] = useState(false);
   const [logoutCountdown, setLogoutCountdown] = useState(60);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -286,8 +291,30 @@ function Chat({ session }) {
     if (roomId) {
       await supabase.rpc("lock_conversation", { target_conversation_id: roomId });
     }
+    try {
+      if ("serviceWorker" in navigator) {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription) {
+          await fetch("/api/push/subscribe", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+            body: JSON.stringify({ endpoint: subscription.endpoint }),
+          });
+          await subscription.unsubscribe();
+        }
+      }
+    } catch {}
     await supabase.auth.signOut();
   }
+
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("/sw.js").then(async (registration) => {
+      const subscription = await registration.pushManager.getSubscription();
+      setPushEnabled(Boolean(subscription));
+    }).catch(() => setPushEnabled(false));
+  }, []);
 
   useEffect(() => {
     const previous = previousRoomId.current;
@@ -367,61 +394,9 @@ function Chat({ session }) {
     return () => { active = false; };
   }, [roomId, unlockedRoomId]);
   useEffect(() => {
-    function notifyForNewMessage(item) {
-      if (!item || item.user_id === session.user.id || !notificationsEnabled) return;
-      if (mutedUntil && new Date(mutedUntil) > new Date()) return;
-
-      const messageText =
-        item.body || (item.attachment_path ? "Imagine nouă" : "Mesaj nou");
-
-      const email = (session.user.email || "").toLowerCase();
-      const username = email.split("@")[0];
-
-      if (mentionsOnly) {
-        const text = messageText.toLowerCase();
-        if (!text.includes(`@${email}`) && !text.includes(`@${username}`)) return;
-      }
-
-      if (soundEnabled) {
-        try {
-          const AudioContextClass =
-            window.AudioContext || window.webkitAudioContext;
-          const context = new AudioContextClass();
-          const oscillator = context.createOscillator();
-          const gain = context.createGain();
-
-          oscillator.connect(gain);
-          gain.connect(context.destination);
-          oscillator.frequency.value = 740;
-          gain.gain.setValueAtTime(0.08, context.currentTime);
-          gain.gain.exponentialRampToValueAtTime(
-            0.001,
-            context.currentTime + 0.18
-          );
-          oscillator.start();
-          oscillator.stop(context.currentTime + 0.18);
-          oscillator.onended = () => context.close();
-        } catch {}
-      }
-
-      if (
-        document.hidden &&
-        "Notification" in window &&
-        Notification.permission === "granted"
-      ) {
-        try {
-          new Notification(room?.title || "eClinic Chat", {
-            body: messageText.slice(0, 140),
-            tag: `message-${item.id}`,
-          });
-        } catch {}
-      }
-    }
-    
-    if (!roomId || unlockedRoomId !== roomId) { setMessages([]); setReactions([]); return; }
+    if (!roomId) return;
     let active = true;
-        supabase
-      .from("notification_preferences")
+    supabase.from("notification_preferences")
       .select("notifications_enabled, sound_enabled, mentions_only, muted_until")
       .eq("conversation_id", roomId)
       .maybeSingle()
@@ -432,6 +407,11 @@ function Chat({ session }) {
         setMentionsOnly(data?.mentions_only ?? false);
         setMutedUntil(data?.muted_until || "");
       });
+    return () => { active = false; };
+  }, [roomId]);
+  useEffect(() => {
+    if (!roomId || unlockedRoomId !== roomId) { setMessages([]); setReactions([]); return; }
+    let active = true;
     setMessages([]);
     setReactions([]);
     setError("");
@@ -449,7 +429,6 @@ function Chat({ session }) {
       event: "INSERT", schema: "public", table: "private_messages", filter: `conversation_id=eq.${roomId}`,
     }, ({ new: item }) => {
       setMessages((current) => current.some((x) => x.id === item.id) ? current : [...current, item]);
-            notifyForNewMessage(item);
       supabase.rpc("mark_conversation_read", { target_conversation_id: roomId }).then(() => loadRooms(roomId));
     }).on("postgres_changes", {
       event: "UPDATE", schema: "public", table: "private_messages", filter: `conversation_id=eq.${roomId}`,
@@ -459,7 +438,7 @@ function Chat({ session }) {
       }, () => supabase.from("message_reactions").select("*").eq("conversation_id", roomId).then(({ data }) => active && setReactions(data || [])))
       .subscribe();
     return () => { active = false; supabase.removeChannel(channel); };
- }, [roomId, unlockedRoomId, settingsOpen]);
+  }, [roomId, unlockedRoomId]);
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   useEffect(() => {
@@ -515,6 +494,11 @@ function Chat({ session }) {
       if (fileInput.current) fileInput.current.value = "";
       setMessages((current) => current.some((x) => x.id === data.id) ? current : [...current, data]);
       loadRooms(roomId);
+      fetch("/api/push/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ messageId: data.id }),
+      }).catch(() => {});
     }
     setSending(false);
   }
@@ -704,44 +688,75 @@ function Chat({ session }) {
     ]);
     if (passwordResult.error) setSettingsError(passwordResult.error.message);
     else setPasswordProtected(Boolean(passwordResult.data));
-        const { data: preference, error: preferenceError } = await supabase
+    const { data: preference, error: preferenceError } = await supabase
       .from("notification_preferences")
       .select("notifications_enabled, sound_enabled, mentions_only, muted_until")
       .eq("conversation_id", roomId)
       .maybeSingle();
-
-    if (preferenceError) {
-      setSettingsError(preferenceError.message);
-    } else {
+    if (preferenceError) setSettingsError(preferenceError.message);
+    else {
       setNotificationsEnabled(preference?.notifications_enabled ?? true);
       setSoundEnabled(preference?.sound_enabled ?? true);
       setMentionsOnly(preference?.mentions_only ?? false);
       setMutedUntil(preference?.muted_until || "");
     }
   }
-  async function saveNotificationPreferences() {
-    if (!roomId || notificationBusy) return;
 
+  async function saveNotificationPreferences(e) {
+    e?.preventDefault();
+    if (!roomId || notificationBusy) return;
     setNotificationBusy(true);
     setSettingsError("");
-
-    const { error: saveError } = await supabase
-      .from("notification_preferences")
-      .upsert({
-        user_id: session.user.id,
-        conversation_id: roomId,
-        notifications_enabled: notificationsEnabled,
-        sound_enabled: soundEnabled,
-        mentions_only: mentionsOnly,
-        muted_until: mutedUntil || null,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: "user_id,conversation_id",
-      });
-
+    const { error: saveError } = await supabase.from("notification_preferences").upsert({
+      user_id: session.user.id,
+      conversation_id: roomId,
+      notifications_enabled: notificationsEnabled,
+      sound_enabled: soundEnabled,
+      mentions_only: mentionsOnly,
+      muted_until: mutedUntil || null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id,conversation_id" });
     if (saveError) setSettingsError(saveError.message);
     setNotificationBusy(false);
   }
+
+  async function enablePushNotifications() {
+    if (notificationBusy) return;
+    setNotificationBusy(true);
+    setSettingsError("");
+    try {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+        throw new Error("Acest browser nu acceptă notificări push.");
+      }
+      const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!publicKey) throw new Error("Cheia publică pentru notificări nu este configurată.");
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") throw new Error("Notificările nu au fost permise.");
+
+      const registration = await navigator.serviceWorker.register("/sw.js");
+      await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey),
+        });
+      }
+      const response = await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify(subscription.toJSON()),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Abonarea nu a reușit.");
+      setPushEnabled(true);
+    } catch (pushError) {
+      setPushEnabled(false);
+      setSettingsError(pushError.message || "Notificările nu au putut fi activate.");
+    }
+    setNotificationBusy(false);
+  }
+
   async function unlockConversation(e) {
     e.preventDefault();
     if (!roomPassword || passwordBusy) return;
@@ -947,83 +962,27 @@ function Chat({ session }) {
       {isAdmin && <form className="manageSection" onSubmit={renameConversation}>
         <label>Numele grupului<div className="inlineForm"><input required maxLength={80} value={settingsTitle} onChange={(e) => setSettingsTitle(e.target.value)} /><button className="primary" disabled={settingsBusy || !settingsTitle.trim()}>Salvează</button></div></label>
       </form>}
-                <form className="manageSection" onSubmit={(e) => {
-          e.preventDefault();
-          saveNotificationPreferences();
-        }}>
-          <div className="sectionHeading">
-            <strong>Notificări</strong>
-            <small>Setări valabile numai pentru contul tău</small>
-          </div>
-
-          <label>
-            <input
-              type="checkbox"
-              checked={notificationsEnabled}
-              onChange={(e) => setNotificationsEnabled(e.target.checked)}
-            />
-            Primește notificări pentru acest grup
-          </label>
-
-          <label>
-            <input
-              type="checkbox"
-              checked={soundEnabled}
-              disabled={!notificationsEnabled}
-              onChange={(e) => setSoundEnabled(e.target.checked)}
-            />
-            Sunet pentru mesajele noi
-          </label>
-
-          <label>
-            <input
-              type="checkbox"
-              checked={mentionsOnly}
-              disabled={!notificationsEnabled}
-              onChange={(e) => setMentionsOnly(e.target.checked)}
-            />
-            Notifică-mă numai când sunt menționat
-          </label>
-
-          <div className="memberActions">
-            <button type="button" onClick={() =>
-              setMutedUntil(new Date(Date.now() + 60 * 60 * 1000).toISOString())
-            }>Silențios 1 oră</button>
-
-            <button type="button" onClick={() =>
-              setMutedUntil(new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString())
-            }>Silențios 8 ore</button>
-
-            <button type="button" onClick={() => setMutedUntil("")}>
-              Reia acum
-            </button>
-          </div>
-
-          <p className="helper">
-            {mutedUntil && new Date(mutedUntil) > new Date()
-              ? `Notificări oprite până la ${new Date(mutedUntil).toLocaleString("ro-RO")}`
-              : "Notificările nu sunt suspendate temporar."}
-          </p>
-          {typeof window !== "undefined" && "Notification" in window && (
-            <button type="button" onClick={async () => {
-              try {
-                const permission = await Notification.requestPermission();
-                setSettingsError(
-                  permission === "granted"
-                    ? ""
-                    : "Notificările browserului nu au fost permise."
-                );
-              } catch {
-                setSettingsError("Notificările nu pot fi activate în acest browser.");
-              }
-            }}>
-              Activează notificările în browser
-            </button>
-          )}
-          <button className="primary" disabled={notificationBusy}>
-            {notificationBusy ? "Se salvează..." : "Salvează notificările"}
-          </button>
-        </form>
+      <form className="manageSection" onSubmit={saveNotificationPreferences}>
+        <div className="sectionHeading"><strong>Notificări</strong><small>Numai pentru contul tău</small></div>
+        <label className="checkLabel"><input type="checkbox" checked={notificationsEnabled} onChange={(e) => setNotificationsEnabled(e.target.checked)} />Primește notificări pentru acest grup</label>
+        <label className="checkLabel"><input type="checkbox" checked={soundEnabled} disabled={!notificationsEnabled} onChange={(e) => setSoundEnabled(e.target.checked)} />Sunet pentru mesajele noi</label>
+        <label className="checkLabel"><input type="checkbox" checked={mentionsOnly} disabled={!notificationsEnabled} onChange={(e) => setMentionsOnly(e.target.checked)} />Notifică-mă numai când sunt menționat</label>
+        <div className="memberActions notificationActions">
+          <button type="button" onClick={() => setMutedUntil(new Date(Date.now() + 60 * 60 * 1000).toISOString())}>Silențios 1 oră</button>
+          <button type="button" onClick={() => setMutedUntil(new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString())}>Silențios 8 ore</button>
+          <button type="button" onClick={() => setMutedUntil("")}>Reia acum</button>
+        </div>
+        <p className="helper">
+          {mutedUntil && new Date(mutedUntil) > new Date()
+            ? `Notificări oprite până la ${new Date(mutedUntil).toLocaleString("ro-RO")}`
+            : "Notificările nu sunt suspendate temporar."}
+        </p>
+        <button type="button" onClick={enablePushNotifications} disabled={notificationBusy}>
+          {pushEnabled ? "✓ Notificări push active pe acest dispozitiv" : "Activează notificările pe acest dispozitiv"}
+        </button>
+        <p className="helper">Pe iPhone: deschide pagina din pictograma adăugată pe ecranul principal, apoi activează notificările aici.</p>
+        <button className="primary" disabled={notificationBusy}>{notificationBusy ? "Se salvează..." : "Salvează notificările"}</button>
+      </form>
       <div className="manageSection"><div className="sectionHeading"><strong>Membri</strong><small>{members.length}</small></div>
         <div className="memberList">{members.map((member) => <div className="memberRow" key={member.user_id}><div><strong>{member.email}</strong><small>{member.is_owner ? "Proprietar · Administrator" : member.is_admin ? "Administrator" : "Membru"}</small></div>
           <div className="memberActions">{isOwner && !member.is_owner && <button disabled={settingsBusy} onClick={() => toggleAdmin(member)}>{member.is_admin ? "Retrage admin" : "Fă admin"}</button>}
