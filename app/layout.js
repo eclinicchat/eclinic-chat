@@ -1,13 +1,13 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "eClinic Chat",
-  description: "Chat securizat pentru echipe medicale",
+  title: "eClinTalk",
+  description: "Conversații private și comunități conectate",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "eClinic Chat",
+    title: "eClinTalk",
   },
   icons: {
     icon: "/icon.svg",

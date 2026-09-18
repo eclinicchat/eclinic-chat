@@ -1,8 +1,8 @@
 export default function manifest() {
   return {
-    name: "eClinic Chat",
-    short_name: "eClinic Chat",
-    description: "Chat securizat pentru echipe medicale",
+    name: "eClinTalk",
+    short_name: "eClinTalk",
+    description: "Conversații private și comunități conectate",
     start_url: "/",
     display: "standalone",
     background_color: "#07101d",

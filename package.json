@@ -1,6 +1,6 @@
 {
-  "name": "eclinic-chat",
-  "version": "1.6.0",
+  "name": "eclintalk",
+  "version": "1.7.0",
   "private": true,
   "scripts": {
     "dev": "next dev",

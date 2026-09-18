@@ -28,7 +28,7 @@ export async function POST(request) {
 
   const { data: message } = await clients.adminClient
     .from("private_messages")
-    .select("id, conversation_id, user_id, body, attachment_path")
+    .select("id, conversation_id, user_id, body, attachment_path, mentioned_user_ids")
     .eq("id", messageId)
     .maybeSingle();
   if (!message || message.user_id !== sender.id) {
@@ -69,6 +69,10 @@ export async function POST(request) {
     if (muted && (!muted.muted_until || new Date(muted.muted_until) > now)) continue;
 
     if (preference?.mentions_only) {
+      if ((message.mentioned_user_ids || []).includes(userId)) {
+        eligibleIds.push(userId);
+        continue;
+      }
       const { data: recipientData } = await clients.adminClient.auth.admin.getUserById(userId);
       const email = (recipientData?.user?.email || "").toLowerCase();
       const username = email.split("@")[0];
@@ -79,11 +83,16 @@ export async function POST(request) {
   }
   if (!eligibleIds.length) return Response.json({ ok: true, sent: 0 });
 
-  const { data: subscriptions } = await clients.adminClient
-    .from("push_subscriptions")
-    .select("id, user_id, endpoint, p256dh, auth")
-    .in("user_id", eligibleIds);
+  const [{ data: subscriptions }, { data: recipientProfiles }] = await Promise.all([
+    clients.adminClient.from("push_subscriptions")
+      .select("id, user_id, endpoint, p256dh, auth")
+      .in("user_id", eligibleIds),
+    clients.adminClient.from("profiles")
+      .select("user_id, preferred_language")
+      .in("user_id", eligibleIds),
+  ]);
   if (!subscriptions?.length) return Response.json({ ok: true, sent: 0 });
+  const languageByUser = new Map((recipientProfiles || []).map((item) => [item.user_id, item.preferred_language]));
 
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
@@ -94,9 +103,10 @@ export async function POST(request) {
   await Promise.all((subscriptions || []).map(async (subscription) => {
     try {
       const preference = preferenceByUser.get(subscription.user_id);
+      const recipientLanguage = languageByUser.get(subscription.user_id) || "ro";
       const payload = JSON.stringify({
-        title: conversation?.title || "eClinic Chat",
-        body: "Ai primit un mesaj nou.",
+        title: conversation?.title || "eClinTalk",
+        body: recipientLanguage === "en" ? "You received a new message." : "Ai primit un mesaj nou.",
         tag: `message-${message.id}`,
         url: "/",
         silent: preference?.sound_enabled === false,

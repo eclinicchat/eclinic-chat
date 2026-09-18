@@ -1,4 +1,17 @@
-# eClinic Chat v1.6.0
+# eClinTalk v1.7.0
+
+Versiunea v1.7 redenumește aplicația în **eClinTalk**, simplifică meniul și pagina de început, adaugă interfață română/engleză, profil cu nume afișat și menționări prin `@nume`. Logo-ul și pictograma existente rămân neschimbate, iar mențiunea „Creat de eClinic Hub” apare discret.
+
+## Actualizare de la v1.6
+
+1. Rulează integral, o singură dată, fișierul `supabase-eclintalk-v1.7.sql` în **Supabase → SQL Editor → New query → Run**.
+2. Încarcă în GitHub toate fișierele aplicației din această versiune.
+3. Așteaptă ca publicarea Vercel să ajungă la starea **Ready**.
+4. După autentificare, deschide **Profil** pentru a alege numele afișat și limba interfeței.
+
+Scriptul v1.7 trebuie rulat înainte de publicarea aplicației, deoarece mesajele noi salvează identificatorii persoanelor menționate. Pe iPhone, dacă numele de sub pictogramă nu se actualizează automat, elimină pictograma veche și adaugă din nou aplicația pe ecranul principal.
+
+## Versiunea v1.6
 
 Versiunea v1.6 adaugă notificări Web Push reale, instalare PWA pe Mac/iPhone și preferințe individuale pe grup. Notificarea afișează doar numele grupului și textul generic „Ai primit un mesaj nou”, fără conținutul conversației.
 
@@ -10,9 +23,9 @@ Versiunea v1.6 adaugă notificări Web Push reale, instalare PWA pe Mac/iPhone �
    - `SUPABASE_SERVICE_ROLE_KEY` — cheia `service_role` din Supabase; este secretă și nu se introduce în GitHub.
    - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` — cheia publică Web Push.
    - `VAPID_PRIVATE_KEY` — cheia privată Web Push; este secretă și nu se introduce în GitHub.
-4. După redeploy, deschide **Gestionează → Notificări → Activează notificările pe acest dispozitiv**.
+4. După redeploy, deschide **Setări → Notificări → Activează notificările pe acest dispozitiv**.
 
-Pe iPhone, notificările Web Push funcționează după instalarea aplicației pe ecranul principal: Safari → Partajare → Adaugă la ecranul principal. Apoi aplicația se deschide din pictograma eClinic Chat, iar notificările se activează din meniul grupului.
+Pe iPhone, notificările Web Push funcționează după instalarea aplicației pe ecranul principal: Safari → Partajare → Adaugă la ecranul principal. Apoi aplicația se deschide din pictograma eClinTalk, iar notificările se activează din meniul grupului.
 
 La ieșirea explicită din cont, abonamentul push al dispozitivului este eliminat pentru protejarea confidențialității. Pentru a primi din nou notificări după autentificare, acestea se reactivează din meniul grupului.
 
@@ -83,6 +96,7 @@ Rulează în această ordine:
 7. `supabase-security-v1.2.sql`
 8. `supabase-message-deletion-v1.4.sql`
 9. `supabase-push-notifications-v1.6.sql`
+10. `supabase-eclintalk-v1.7.sql`
 
 În Vercel trebuie configurate variabilele `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY` și `VAPID_PRIVATE_KEY`.
 

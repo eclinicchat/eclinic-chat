@@ -6,7 +6,7 @@ self.addEventListener("push", (event) => {
     payload = { body: "Ai primit un mesaj nou." };
   }
 
-  event.waitUntil(self.registration.showNotification(payload.title || "eClinic Chat", {
+  event.waitUntil(self.registration.showNotification(payload.title || "eClinTalk", {
     body: payload.body || "Ai primit un mesaj nou.",
     icon: "/icon-192.png",
     badge: "/icon-192.png",
