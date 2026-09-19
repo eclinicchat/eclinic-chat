@@ -1,4 +1,6 @@
-# eClinTalk v1.9.1
+# eClinTalk v1.9.2
+
+Versiunea v1.9.2 include toate corectiile cumulative pentru notificari persistente, interfata RO/EN si compatibilitatea formularului de autentificare cu managerii de parole ai dispozitivelor.
 
 Versiunea v1.9.1 imbunatateste recunoasterea formularului de autentificare de catre Safari/iCloud Passwords si Chrome/Google Password Manager, folosind identificatori standard pentru email si parola si un buton explicit de trimitere a formularului.
 
