@@ -1,4 +1,6 @@
-# eClinTalk v1.8.0
+# eClinTalk v1.9.0
+
+Versiunea v1.9 permite managerelor de parole din Safari, iPhone/iPad, Chrome, Android și Windows să recunoască formularul de autentificare, să ofere conturile salvate și să propună salvarea parolei după conectare. Include și afișarea/ascunderea parolei. Parolele rămân administrate exclusiv de managerul securizat al dispozitivului și nu sunt accesibile aplicației.
 
 Versiunea v1.8 păstrează notificările dispozitivului după delogare, reasociază automat abonamentul push după autentificare și adaugă controlul global de activare/dezactivare pe fiecare dispozitiv. Preferințele pentru notificări, sunet, mențiuni și suspendarea temporară rămân separate pentru fiecare grup.
 

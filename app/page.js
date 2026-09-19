@@ -79,6 +79,7 @@ function Login({ language, setLanguage }) {
   const [forgotPassword, setForgotPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
 
@@ -115,15 +116,16 @@ function Login({ language, setLanguage }) {
     <p className="appName">eClinTalk</p>
     <h1>{forgotPassword ? (language === "en" ? "Reset password" : "Recuperează parola") : signup ? (language === "en" ? "Create account" : "Creează cont") : t("secureSignIn")}</h1>
     <p className="muted">{t("privateHelp")}</p>
-    {forgotPassword ? <form onSubmit={sendResetLink} className="form">
-      <label>{t("email")}<input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+    {forgotPassword ? <form onSubmit={sendResetLink} className="form" autoComplete="on">
+      <label htmlFor="recovery-email">{t("email")}<input id="recovery-email" name="email" type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
       {notice && <p className={notice.error ? "error" : "success"}>{notice.text}</p>}
       <button disabled={busy} className="primary">{busy ? (language === "en" ? "Sending..." : "Se trimite...") : (language === "en" ? "Send recovery link" : "Trimite linkul de recuperare")}</button>
-    </form> : <form onSubmit={submit} className="form">
-      <label>{t("email")}<input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
-      <label>{t("password")}<input type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+    </form> : <form onSubmit={submit} className="form" autoComplete="on">
+      <label htmlFor="login-email">{t("email")}<input id="login-email" name="username" type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+      <label htmlFor="login-password">{t("password")}<span className="passwordField"><input id="login-password" name="password" type={showPassword ? "text" : "password"} autoComplete={signup ? "new-password" : "current-password"} required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} /><button type="button" className="passwordToggle" aria-label={showPassword ? (language === "en" ? "Hide password" : "Ascunde parola") : (language === "en" ? "Show password" : "Arată parola")} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? "🙈" : "👁️"}</button></span></label>
       {notice && <p className={notice.error ? "error" : "success"}>{notice.text}</p>}
       <button disabled={busy} className="primary">{busy ? t("processing") : signup ? (language === "en" ? "Create account" : "Creează cont") : t("enterApp")}</button>
+      {!signup && <p className="passwordHelp">{language === "en" ? "Saved credentials are securely filled and managed by your device's password manager." : "Datele salvate sunt completate și administrate în siguranță de managerul de parole al dispozitivului."}</p>}
     </form>}
     {!forgotPassword && !signup && <button className="linkBtn" onClick={() => { setForgotPassword(true); setNotice(null); }}>
       {t("forgot")}
@@ -165,9 +167,9 @@ function UpdatePassword({ completed, language }) {
     <div className="logo">eC</div><p className="appName">eClinTalk</p>
     <h1>{l("Alege o parolă nouă", "Choose a new password")}</h1>
     <p className="muted">{l("Folosește minimum 8 caractere și nu reutiliza o parolă veche.", "Use at least 8 characters and do not reuse an old password.")}</p>
-    <form onSubmit={submit} className="form">
-      <label>{l("Parola nouă", "New password")}<input type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} /></label>
-      <label>{l("Confirmă parola", "Confirm password")}<input type="password" required minLength={8} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} /></label>
+    <form onSubmit={submit} className="form" autoComplete="on">
+      <label>{l("Parola nouă", "New password")}<input name="new-password" type="password" autoComplete="new-password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+      <label>{l("Confirmă parola", "Confirm password")}<input name="confirm-password" type="password" autoComplete="new-password" required minLength={8} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} /></label>
       {notice && <p className={notice.error ? "error" : "success"}>{notice.text}</p>}
       <button className="primary" disabled={busy || password.length < 8 || confirmPassword.length < 8}>{busy ? l("Se salvează...", "Saving...") : l("Salvează parola nouă", "Save new password")}</button>
     </form>
