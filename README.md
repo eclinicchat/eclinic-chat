@@ -1,4 +1,6 @@
-# eClinTalk v1.9.0
+# eClinTalk v1.9.1
+
+Versiunea v1.9.1 imbunatateste recunoasterea formularului de autentificare de catre Safari/iCloud Passwords si Chrome/Google Password Manager, folosind identificatori standard pentru email si parola si un buton explicit de trimitere a formularului.
 
 Versiunea v1.9 permite managerelor de parole din Safari, iPhone/iPad, Chrome, Android și Windows să recunoască formularul de autentificare, să ofere conturile salvate și să propună salvarea parolei după conectare. Include și afișarea/ascunderea parolei. Parolele rămân administrate exclusiv de managerul securizat al dispozitivului și nu sunt accesibile aplicației.
 
