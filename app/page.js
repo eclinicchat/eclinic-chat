@@ -376,35 +376,30 @@ function Chat({ session, language, setLanguage }) {
     if (roomId) {
       await supabase.rpc("lock_conversation", { target_conversation_id: roomId });
     }
-    try {
-      if ("serviceWorker" in navigator) {
-        const registration = await navigator.serviceWorker.ready;
-        const subscription = await registration.pushManager.getSubscription();
-        if (subscription) {
-          await fetch("/api/push/subscribe", {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-            body: JSON.stringify({ endpoint: subscription.endpoint }),
-          });
-          await subscription.unsubscribe();
-        }
-      }
-    } catch {}
     await supabase.auth.signOut();
   }
 
   useEffect(() => {
-    if (!("serviceWorker" in navigator)) return;
+    if (!("serviceWorker" in navigator) || !("Notification" in window)) return;
     let active = true;
     navigator.serviceWorker.register("/sw.js")
       .then(() => navigator.serviceWorker.ready)
       .then(async (registration) => {
         const subscription = await registration.pushManager.getSubscription();
-        if (active) setPushEnabled(Boolean(subscription));
+        const isEnabled = Boolean(subscription) && Notification.permission === "granted";
+        if (active) setPushEnabled(isEnabled);
+        if (isEnabled) {
+          const response = await fetch("/api/push/subscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+            body: JSON.stringify(subscription.toJSON()),
+          });
+          if (!response.ok && active) setPushEnabled(false);
+        }
       })
       .catch(() => active && setPushEnabled(false));
     return () => { active = false; };
-  }, []);
+  }, [session.access_token]);
 
   useEffect(() => {
     const previous = previousRoomId.current;
@@ -830,7 +825,7 @@ function Chat({ session, language, setLanguage }) {
     setNotificationBusy(false);
   }
 
-  async function enablePushNotifications() {
+  async function togglePushNotifications() {
     if (notificationBusy) return;
     setNotificationBusy(true);
     setSettingsError("");
@@ -838,14 +833,30 @@ function Chat({ session, language, setLanguage }) {
       if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
         throw new Error(l("Acest browser nu acceptă notificări push.", "This browser does not support push notifications."));
       }
+      const registration = await navigator.serviceWorker.register("/sw.js");
+      await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
+
+      if (pushEnabled) {
+        if (subscription) {
+          const response = await fetch("/api/push/subscribe", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+            body: JSON.stringify({ endpoint: subscription.endpoint }),
+          });
+          if (!response.ok) throw new Error(l("Dezactivarea nu a reușit.", "Disabling notifications failed."));
+          await subscription.unsubscribe();
+        }
+        setPushEnabled(false);
+        setNotificationBusy(false);
+        return;
+      }
+
       const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!publicKey) throw new Error(l("Cheia publică pentru notificări nu este configurată.", "The public notification key is not configured."));
       const permission = await Notification.requestPermission();
       if (permission !== "granted") throw new Error(l("Notificările nu au fost permise.", "Notification permission was not granted."));
 
-      const registration = await navigator.serviceWorker.register("/sw.js");
-      await navigator.serviceWorker.ready;
-      let subscription = await registration.pushManager.getSubscription();
       if (!subscription) {
         subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
@@ -1091,10 +1102,10 @@ function Chat({ session, language, setLanguage }) {
             ? l(`Notificări oprite până la ${new Date(mutedUntil).toLocaleString("ro-RO")}`, `Notifications muted until ${new Date(mutedUntil).toLocaleString("en-GB")}`)
             : l("Notificările nu sunt suspendate temporar.", "Notifications are not temporarily muted.")}
         </p>
-        <button type="button" onClick={enablePushNotifications} disabled={notificationBusy}>
-          {pushEnabled ? l("✓ Notificări push active pe acest dispozitiv", "✓ Push notifications active on this device") : l("Activează notificările pe acest dispozitiv", "Enable notifications on this device")}
+        <button type="button" onClick={togglePushNotifications} disabled={notificationBusy}>
+          {pushEnabled ? l("✓ Notificări active — apasă pentru dezactivare", "✓ Notifications active — tap to disable") : l("Activează notificările pe acest dispozitiv", "Enable notifications on this device")}
         </button>
-        <p className="helper">{l("Pe iPhone: deschide pagina din pictograma adăugată pe ecranul principal, apoi activează notificările aici.", "On iPhone: open the app from the Home Screen icon, then enable notifications here.")}</p>
+        <p className="helper">{l("Setarea rămâne activă după delogare. Sunetul și vibrația urmează modul dispozitivului. Pe iPhone, activează notificările din aplicația deschisă prin pictograma de pe ecranul principal.", "This setting remains active after sign-out. Sound and vibration follow the device mode. On iPhone, enable notifications from the app opened through its Home Screen icon.")}</p>
         <button className="primary" disabled={notificationBusy}>{notificationBusy ? l("Se salvează...", "Saving...") : l("Salvează notificările", "Save notifications")}</button>
       </form>
       <div className="manageSection"><div className="sectionHeading"><strong>{l("Membri", "Members")}</strong><small>{members.length}</small></div>

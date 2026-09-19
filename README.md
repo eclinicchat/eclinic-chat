@@ -1,4 +1,21 @@
-# eClinTalk v1.7.0
+# eClinTalk v1.8.0
+
+Versiunea v1.8 păstrează notificările dispozitivului după delogare, reasociază automat abonamentul push după autentificare și adaugă controlul global de activare/dezactivare pe fiecare dispozitiv. Preferințele pentru notificări, sunet, mențiuni și suspendarea temporară rămân separate pentru fiecare grup.
+
+Numele, titlul paginii, manifestul instalabil și descrierea publică folosesc acum consecvent **eClinTalk** și textul „Comunicare sigură pentru echipe și comunități”. Aplicația este pregătită ca PWA pentru iPhone, Android, Mac și Windows.
+
+## Actualizare de la v1.7
+
+1. Încarcă în GitHub toate fișierele aplicației din această versiune.
+2. Așteaptă publicarea Vercel cu starea **Ready**.
+3. Nu este necesar un script SQL nou.
+4. Deschide aplicația pe fiecare dispozitiv și verifică butonul de stare din **Setări → Notificări**.
+
+Delogarea nu mai șterge abonamentul push. Oprirea completă se face explicit apăsând butonul „Notificări active — apasă pentru dezactivare”. La autentificare, un abonament existent este asociat automat contului curent.
+
+Pentru actualizarea numelui de sub pictogramă pe iPhone, poate fi necesară eliminarea pictogramei vechi și adăugarea din nou a aplicației pe ecranul principal. Pe Android se instalează din Chrome, iar pe Windows din Edge sau Chrome.
+
+## Versiunea v1.7
 
 Versiunea v1.7 redenumește aplicația în **eClinTalk**, simplifică meniul și pagina de început, adaugă interfață română/engleză, profil cu nume afișat și menționări prin `@nume`. Logo-ul și pictograma existente rămân neschimbate, iar mențiunea „Creat de eClinic Hub” apare discret.
 
@@ -27,7 +44,7 @@ Versiunea v1.6 adaugă notificări Web Push reale, instalare PWA pe Mac/iPhone �
 
 Pe iPhone, notificările Web Push funcționează după instalarea aplicației pe ecranul principal: Safari → Partajare → Adaugă la ecranul principal. Apoi aplicația se deschide din pictograma eClinTalk, iar notificările se activează din meniul grupului.
 
-La ieșirea explicită din cont, abonamentul push al dispozitivului este eliminat pentru protejarea confidențialității. Pentru a primi din nou notificări după autentificare, acestea se reactivează din meniul grupului.
+Începând cu v1.8, ieșirea din cont nu mai elimină abonamentul push al dispozitivului. Acesta este reasociat automat la următoarea autentificare și poate fi dezactivat explicit din meniul grupului.
 
 ## Versiunea v1.5
 

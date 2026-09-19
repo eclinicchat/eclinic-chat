@@ -10,7 +10,7 @@ self.addEventListener("push", (event) => {
     body: payload.body || "Ai primit un mesaj nou.",
     icon: "/icon-192.png",
     badge: "/icon-192.png",
-    tag: payload.tag || "eclinic-message",
+    tag: payload.tag || "eclintalk-message",
     renotify: true,
     silent: payload.silent === true,
     data: { url: payload.url || "/" },

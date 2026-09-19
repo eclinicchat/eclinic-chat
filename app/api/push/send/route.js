@@ -97,7 +97,7 @@ export async function POST(request) {
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
   if (!publicKey || !privateKey) return Response.json({ error: "Cheile push lipsesc" }, { status: 503 });
-  webpush.setVapidDetails("https://eclinic-chat.vercel.app", publicKey, privateKey);
+  webpush.setVapidDetails(new URL(request.url).origin, publicKey, privateKey);
 
   let sent = 0;
   await Promise.all((subscriptions || []).map(async (subscription) => {

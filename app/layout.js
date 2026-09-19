@@ -1,8 +1,12 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "eClinTalk",
-  description: "Conversații private și comunități conectate",
+  applicationName: "eClinTalk",
+  title: {
+    default: "eClinTalk",
+    template: "%s · eClinTalk",
+  },
+  description: "Comunicare sigură pentru echipe și comunități",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
@@ -12,6 +16,11 @@ export const metadata = {
   icons: {
     icon: "/icon.svg",
     apple: "/icon-192.png",
+  },
+  openGraph: {
+    title: "eClinTalk",
+    description: "Comunicare sigură pentru echipe și comunități",
+    type: "website",
   },
 };
 
