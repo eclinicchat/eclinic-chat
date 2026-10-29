@@ -1,6 +1,8 @@
-# eClinTalk v1.11.0
+# eClinTalk v1.12.0
 
-Versiunea v1.11.0 clarifica administrarea comunitatilor. Sectiunea „Comunitatile mele” este afisata permanent, grupurile din afara comunitatilor sunt denumite explicit, iar administratorii au un buton vizibil „Membri si setari”. Fereastra de administrare explica fluxul corect, plaseaza adaugarea membrilor inaintea listei existente si confirma vizibil actiunile reusite. Butonul pentru grup nou arata comunitatea in care va fi creat grupul.
+Versiunea v1.12.0 adauga invitatii prin link pentru comunitati si grupuri. Administratorul poate introduce o adresa de email chiar daca persoana nu are inca un cont, poate selecta grupurile dorite si poate copia un link valabil 7 zile. Dupa crearea contului sau autentificare, invitatia este acceptata automat. Conturile deja existente sunt adaugate imediat.
+
+Inainte de folosirea invitatiilor, ruleaza integral `supabase-invitations-v1.12.sql` in Supabase SQL Editor.
 
 Actualizarea nu necesita niciun script SQL nou.
 

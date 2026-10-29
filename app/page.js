@@ -88,7 +88,7 @@ async function requestPasswordManagerSave(email, password) {
   }
 }
 
-function Login({ language, setLanguage }) {
+function Login({ language, setLanguage, inviteToken }) {
   const t = translator(language);
   const [signup, setSignup] = useState(false);
   const [forgotPassword, setForgotPassword] = useState(false);
@@ -97,6 +97,21 @@ function Login({ language, setLanguage }) {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
+  const [invitePreview, setInvitePreview] = useState(null);
+
+  useEffect(() => {
+    if (!inviteToken) return;
+    supabase.rpc("get_invitation_preview", { invitation_token: inviteToken }).then(({ data, error }) => {
+      const preview = data?.[0];
+      if (error || !preview?.is_valid) {
+        setNotice({ error: true, text: language === "en" ? "This invitation is invalid or has expired." : "Această invitație nu este validă sau a expirat." });
+        return;
+      }
+      setInvitePreview(preview);
+      setEmail(preview.invitee_email || "");
+      setSignup(true);
+    });
+  }, [inviteToken]);
 
   async function submit(e) {
     e.preventDefault();
@@ -107,7 +122,11 @@ function Login({ language, setLanguage }) {
     setNotice(null);
     try {
       const result = signup
-        ? await supabase.auth.signUp({ email: submittedEmail, password: submittedPassword })
+        ? await supabase.auth.signUp({
+          email: submittedEmail,
+          password: submittedPassword,
+          options: inviteToken ? { emailRedirectTo: `${window.location.origin}/?invite=${encodeURIComponent(inviteToken)}` } : undefined,
+        })
         : await supabase.auth.signInWithPassword({ email: submittedEmail, password: submittedPassword });
       if (result.error) setNotice({ error: true, text: result.error.message });
       else if (signup && !result.data.session) {
@@ -141,6 +160,7 @@ function Login({ language, setLanguage }) {
     <p className="appName">eClinTalk</p>
     <h1>{forgotPassword ? (language === "en" ? "Reset password" : "Recuperează parola") : signup ? (language === "en" ? "Create account" : "Creează cont") : t("secureSignIn")}</h1>
     <p className="muted">{t("privateHelp")}</p>
+    {invitePreview && <div className="inviteBanner"><strong>{language === "en" ? `Invitation to ${invitePreview.community_name}` : `Invitație în ${invitePreview.community_name}`}</strong><span>{language === "en" ? `Continue with ${invitePreview.invitee_email}.` : `Continuă cu adresa ${invitePreview.invitee_email}.`}</span></div>}
     {forgotPassword ? <form id="recovery-form" name="recovery" onSubmit={sendResetLink} className="form" autoComplete="on" method="post">
       <label htmlFor="recovery-email">{t("email")}<input id="recovery-email" name="email" type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
       {notice && <p className={notice.error ? "error" : "success"}>{notice.text}</p>}
@@ -271,7 +291,7 @@ function NewCommunity({ close, created, language }) {
   </section></div>;
 }
 
-function Chat({ session, language, setLanguage }) {
+function Chat({ session, language, setLanguage, inviteToken, invitationCompleted }) {
   const t = translator(language);
   const l = (ro, en) => localize(language, ro, en);
   const [rooms, setRooms] = useState([]);
@@ -287,6 +307,9 @@ function Chat({ session, language, setLanguage }) {
   const [communityBusy, setCommunityBusy] = useState(false);
   const [communityError, setCommunityError] = useState("");
   const [communityNotice, setCommunityNotice] = useState("");
+  const [communityInviteGroups, setCommunityInviteGroups] = useState([]);
+  const [communityInviteLinks, setCommunityInviteLinks] = useState([]);
+  const [inviteStatus, setInviteStatus] = useState("");
   const [roomId, setRoomId] = useState(null);
   const [unlockedRoomId, setUnlockedRoomId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -499,6 +522,26 @@ function Chat({ session, language, setLanguage }) {
         if (data?.preferred_language) setLanguage(data.preferred_language);
       });
   }, []);
+  useEffect(() => {
+    if (!inviteToken) return;
+    let active = true;
+    setInviteStatus(l("Se acceptă invitația...", "Accepting invitation..."));
+    supabase.rpc("accept_community_invitation", { invitation_token: inviteToken }).then(async ({ data, error: invitationError }) => {
+      if (!active) return;
+      if (invitationError) {
+        setInviteStatus(l(`Invitația nu a putut fi acceptată: ${invitationError.message}`, `The invitation could not be accepted: ${invitationError.message}`));
+        return;
+      }
+      const accepted = data?.[0];
+      await Promise.all([loadRooms(), loadCommunities()]);
+      setInviteStatus(l(
+        `Ai fost adăugat în comunitatea ${accepted?.community_name || "selectată"}${accepted?.groups_added ? ` și în ${accepted.groups_added} grupuri` : ""}.`,
+        `You joined ${accepted?.community_name || "the selected community"}${accepted?.groups_added ? ` and ${accepted.groups_added} groups` : ""}.`,
+      ));
+      invitationCompleted();
+    });
+    return () => { active = false; };
+  }, [inviteToken]);
   useEffect(() => {
     if (!roomId) { setMessages([]); setUnlockedRoomId(null); return; }
     if (unlockedRoomId === roomId) return;
@@ -746,6 +789,7 @@ function Chat({ session, language, setLanguage }) {
     setCommunityName(selectedCommunity.name);
     setCommunityDescription(selectedCommunity.description || "");
     setCommunityMemberEmails(""); setCommunityMembers([]); setCommunityError(""); setCommunityNotice("");
+    setCommunityInviteGroups([]); setCommunityInviteLinks([]);
     setCommunitySettingsOpen(true);
     await loadCommunityMembers();
   }
@@ -767,12 +811,41 @@ function Chat({ session, language, setLanguage }) {
     const emails = communityMemberEmails.split(/[,\n;]/).map((x) => x.trim().toLowerCase()).filter(Boolean);
     if (!selectedCommunity || !emails.length || communityBusy) return;
     setCommunityBusy(true); setCommunityError(""); setCommunityNotice("");
-    const { error: addError } = await supabase.rpc("add_community_members", {
-      target_community_id: selectedCommunity.id, member_emails: emails,
-    });
+    const results = [];
+    let addError = null;
+    for (const inviteeEmail of emails) {
+      const { data, error: invitationError } = await supabase.rpc("create_community_invitation", {
+        target_community_id: selectedCommunity.id,
+        invitee_email: inviteeEmail,
+        target_conversation_ids: communityInviteGroups,
+      });
+      if (invitationError) { addError = invitationError; break; }
+      if (data?.[0]) results.push(data[0]);
+    }
     if (addError) setCommunityError(addError.message);
-    else { setCommunityMemberEmails(""); await Promise.all([loadCommunityMembers(),loadCommunities(selectedCommunity.id)]); setCommunityNotice(l("Membrii au fost adăugați în comunitate.", "Members were added to the community.")); }
+    else {
+      const links = results.filter((item) => item.outcome === "invited" && item.invitation_token).map((item) => ({
+        email: item.normalized_email,
+        url: `${window.location.origin}/?invite=${item.invitation_token}`,
+      }));
+      const addedCount = results.filter((item) => item.outcome === "added").length;
+      setCommunityInviteLinks(links); setCommunityMemberEmails("");
+      await Promise.all([loadCommunityMembers(),loadCommunities(selectedCommunity.id),loadRooms()]);
+      setCommunityNotice(l(
+        `${addedCount ? `${addedCount} conturi existente au fost adăugate. ` : ""}${links.length ? `${links.length} linkuri de invitație au fost create.` : ""}`.trim(),
+        `${addedCount ? `${addedCount} existing accounts were added. ` : ""}${links.length ? `${links.length} invitation links were created.` : ""}`.trim(),
+      ));
+    }
     setCommunityBusy(false);
+  }
+
+  async function copyInvitation(link) {
+    try {
+      await navigator.clipboard.writeText(link.url);
+      setCommunityNotice(l(`Linkul pentru ${link.email} a fost copiat.`, `The link for ${link.email} was copied.`));
+    } catch {
+      setCommunityError(l("Linkul nu a putut fi copiat automat. Selectează-l și copiază-l manual.", "The link could not be copied automatically. Select and copy it manually."));
+    }
   }
 
   async function toggleCommunityAdmin(member) {
@@ -1057,6 +1130,7 @@ function Chat({ session, language, setLanguage }) {
       <div className="sideFooter"><button className="profileBtn" onClick={openProfile}><strong>{profileName || session.user.email}</strong><small>{t("profile")} · {isGeneralAdmin ? t("generalAdmin") : t("connected")}</small></button><button className="logoutBtn" onClick={signOut} title={t("logout")}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10" /></svg><span>{t("logout")}</span></button><p className="poweredBy sideCredit">{t("createdBy")}</p></div>
     </aside>
     {mobileMenuOpen && <button className="sideBackdrop" onClick={() => setMobileMenuOpen(false)} aria-label={l("Închide meniul", "Close menu")} />}
+    {inviteStatus && <div className="inviteToast"><span>{inviteStatus}</span><button onClick={() => setInviteStatus("")} aria-label={l("Închide", "Close")}>×</button></div>}
     <section className={`chat ${room ? "" : "chatEmpty"}`}>
       {room ? <><header><button className="mobileMenuBtn" onClick={() => setMobileMenuOpen(true)} aria-controls="group-menu" aria-expanded={mobileMenuOpen}>☰</button><div className="headerMain"><strong>{room.title}</strong><small>{room.member_count} {t("members")} · {room.community_name || t("groupWithoutCommunity")} · {l("numai membrii au acces", "members only")}</small></div><div className="headerActions"><b>● {l("Privat", "Private")}</b><button onClick={toggleGroupPin}>{room.is_pinned ? t("pinned") : t("pin")}</button><button onClick={openSettings}>{t("settings")}</button></div></header>
         <div className="warning">{t("testWarning")}</div>
@@ -1160,18 +1234,24 @@ function Chat({ session, language, setLanguage }) {
     </section></div>}
     {communitySettingsOpen && selectedCommunity && <div className="modalBackdrop" onMouseDown={() => !communityBusy && setCommunitySettingsOpen(false)}><section className="modal manageModal" onMouseDown={(e) => e.stopPropagation()}>
       <div className="modalTitle"><div><p className="eyebrow">{selectedCommunity.name}</p><h2>{l("Administrează comunitatea", "Manage community")}</h2></div><button className="iconBtn" disabled={communityBusy} onClick={() => setCommunitySettingsOpen(false)} aria-label={l("Închide", "Close")}>×</button></div>
-      <p className="communityIntro">{l("Adaugă mai întâi persoanele în comunitate. După aceea le poți include în grupurile comunității.", "Add people to the community first. You can then include them in its groups.")}</p>
+      <p className="communityIntro">{l("Adaugă direct conturile existente sau creează un link pentru persoanele care nu au încă un cont. Poți alege și grupurile în care vor intra.", "Add existing accounts directly or create a link for people who do not have an account yet. You can also choose which groups they will join.")}</p>
       <form className="manageSection" onSubmit={saveCommunity}>
         <label>{l("Numele comunității", "Community name")}<input required maxLength={80} value={communityName} onChange={(e) => setCommunityName(e.target.value)} /></label>
         <label>{l("Descriere", "Description")}<textarea rows={2} maxLength={500} value={communityDescription} onChange={(e) => setCommunityDescription(e.target.value)} /></label>
         <button className="primary" disabled={communityBusy || !communityName.trim()}>{t("save")}</button>
       </form>
       <form className="manageSection" onSubmit={addCommunityMembers}>
-        <div className="sectionHeading"><strong>{l("Adaugă membri", "Add members")}</strong><small>{l("după email", "by email")}</small></div>
+        <div className="sectionHeading"><strong>{l("Adaugă sau invită", "Add or invite")}</strong><small>{l("după email", "by email")}</small></div>
         <label>{l("Adresele de email ale persoanelor", "People's email addresses")}<textarea rows={2} placeholder={l("nume@exemplu.ro, alt.nume@exemplu.ro", "name@example.com, another@example.com")} value={communityMemberEmails} onChange={(e) => setCommunityMemberEmails(e.target.value)} /></label>
-        <p className="helper">{l("Persoanele trebuie să aibă deja cont eClinTalk. Poți separa adresele prin virgulă sau le poți scrie pe rânduri diferite.", "People must already have an eClinTalk account. Separate addresses with commas or put them on separate lines.")}</p>
-        <button className="primary" disabled={communityBusy || !communityMemberEmails.trim()}>{l("Adaugă membrii", "Add members")}</button>
+        {rooms.some((item) => item.community_id === selectedCommunity.id) && <fieldset className="inviteGroups"><legend>{l("Adaugă și în grupurile selectate", "Also add to selected groups")}</legend>
+          {rooms.filter((item) => item.community_id === selectedCommunity.id).map((item) => <label className="checkLabel" key={item.id}><input type="checkbox" checked={communityInviteGroups.includes(item.id)} onChange={(e) => setCommunityInviteGroups((current) => e.target.checked ? [...current,item.id] : current.filter((id) => id !== item.id))} />{item.title}</label>)}
+        </fieldset>}
+        <p className="helper">{l("Conturile existente sunt adăugate imediat. Pentru celelalte adrese vei primi câte un link valabil 7 zile.", "Existing accounts are added immediately. For other addresses, you will receive a link valid for 7 days.")}</p>
+        <button className="primary" disabled={communityBusy || !communityMemberEmails.trim()}>{l("Adaugă sau creează invitații", "Add or create invitations")}</button>
       </form>
+      {communityInviteLinks.length>0 && <div className="manageSection invitationResults"><div className="sectionHeading"><strong>{l("Linkuri de trimis", "Links to share")}</strong><small>{communityInviteLinks.length}</small></div>
+        {communityInviteLinks.map((link) => <div className="invitationRow" key={link.email}><div><strong>{link.email}</strong><input readOnly value={link.url} onFocus={(e) => e.target.select()} /></div><button onClick={() => copyInvitation(link)}>{l("Copiază", "Copy")}</button></div>)}
+      </div>}
       <div className="manageSection"><div className="sectionHeading"><strong>{l("Membrii comunității", "Community members")}</strong><small>{communityMembers.length}</small></div>
         <div className="memberList">{communityMembers.map((member) => <div className="memberRow" key={member.user_id}><div><strong>{member.display_name || member.email}</strong><small>{member.email} · {member.is_admin ? l("Administrator de comunitate", "Community administrator") : l("Membru", "Member")}</small></div>
           <div className="memberActions">{isGeneralAdmin && member.user_id !== session.user.id && <button disabled={communityBusy} onClick={() => toggleCommunityAdmin(member)}>{member.is_admin ? l("Retrage admin", "Remove admin") : l("Fă admin", "Make admin")}</button>}
@@ -1212,6 +1292,7 @@ export default function Home() {
   const [session, setSession] = useState(null);
   const [checking, setChecking] = useState(true);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [inviteToken, setInviteToken] = useState("");
   const [language, setLanguageState] = useState("ro");
   function setLanguage(nextLanguage) {
     const safeLanguage = nextLanguage === "en" ? "en" : "ro";
@@ -1222,7 +1303,9 @@ export default function Home() {
   useEffect(() => {
     const storedLanguage = window.localStorage.getItem("eclintalk-language");
     setLanguage(storedLanguage || (navigator.language?.toLowerCase().startsWith("en") ? "en" : "ro"));
-    if (new URLSearchParams(window.location.search).get("recovery") === "1") {
+    const query = new URLSearchParams(window.location.search);
+    setInviteToken(query.get("invite") || "");
+    if (query.get("recovery") === "1") {
       setPasswordRecovery(true);
     }
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setChecking(false); });
@@ -1238,5 +1321,8 @@ export default function Home() {
     window.history.replaceState({}, "", "/");
     setPasswordRecovery(false);
   }} />;
-  return session ? <Chat session={session} language={language} setLanguage={setLanguage} /> : <Login language={language} setLanguage={setLanguage} />;
+  return session ? <Chat session={session} language={language} setLanguage={setLanguage} inviteToken={inviteToken} invitationCompleted={() => {
+    window.history.replaceState({}, "", "/");
+    setInviteToken("");
+  }} /> : <Login language={language} setLanguage={setLanguage} inviteToken={inviteToken} />;
 }
