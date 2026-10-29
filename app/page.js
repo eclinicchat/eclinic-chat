@@ -20,8 +20,8 @@ const UI = {
     secureSignIn: "Conectare securizată", privateHelp: "Conversațiile sunt vizibile numai membrilor adăugați.",
     email: "Email", password: "Parolă", enterApp: "Intră în aplicație", processing: "Se procesează...",
     forgot: "Ai uitat parola?", noAccount: "Nu ai cont? Creează unul", testWarning: "Versiune de test. Nu introduce date medicale sau personale reale.",
-    myConversations: "Conversațiile mele", allConversations: "Toate conversațiile", otherGroups: "Alte grupuri",
-    communities: "Comunități", newGroup: "+ Grup nou", settings: "⚙️ Setări", pin: "📌 Pin", pinned: "📌 Fixat",
+    myConversations: "Conversațiile mele", allConversations: "Toate conversațiile", otherGroups: "Grupuri fără comunitate",
+    communities: "Comunitățile mele", newGroup: "+ Grup nou", settings: "⚙️ Setări", pin: "📌 Pin", pinned: "📌 Fixat",
     logout: "Ieșire", connected: "Conectat", generalAdmin: "Administrator general", members: "membri",
     yourConversations: "Conversațiile tale", chooseConversation: "Alege o conversație pentru a o deschide.",
     noConversations: "Nu există încă nicio conversație disponibilă.", firstGroup: "Creează primul grup",
@@ -34,8 +34,8 @@ const UI = {
     secureSignIn: "Secure sign-in", privateHelp: "Conversations are visible only to added members.",
     email: "Email", password: "Password", enterApp: "Open app", processing: "Processing...",
     forgot: "Forgot your password?", noAccount: "No account? Create one", testWarning: "Test version. Do not enter real medical or personal data.",
-    myConversations: "My conversations", allConversations: "All conversations", otherGroups: "Other groups",
-    communities: "Communities", newGroup: "+ New group", settings: "⚙️ Settings", pin: "📌 Pin", pinned: "📌 Pinned",
+    myConversations: "My conversations", allConversations: "All conversations", otherGroups: "Groups without a community",
+    communities: "My communities", newGroup: "+ New group", settings: "⚙️ Settings", pin: "📌 Pin", pinned: "📌 Pinned",
     logout: "Sign out", connected: "Connected", generalAdmin: "General administrator", members: "members",
     yourConversations: "Your conversations", chooseConversation: "Choose a conversation to open it.",
     noConversations: "There are no conversations available yet.", firstGroup: "Create the first group",
@@ -286,6 +286,7 @@ function Chat({ session, language, setLanguage }) {
   const [communityMemberEmails, setCommunityMemberEmails] = useState("");
   const [communityBusy, setCommunityBusy] = useState(false);
   const [communityError, setCommunityError] = useState("");
+  const [communityNotice, setCommunityNotice] = useState("");
   const [roomId, setRoomId] = useState(null);
   const [unlockedRoomId, setUnlockedRoomId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -744,7 +745,7 @@ function Chat({ session, language, setLanguage }) {
     if (!selectedCommunity) return;
     setCommunityName(selectedCommunity.name);
     setCommunityDescription(selectedCommunity.description || "");
-    setCommunityMemberEmails(""); setCommunityMembers([]); setCommunityError("");
+    setCommunityMemberEmails(""); setCommunityMembers([]); setCommunityError(""); setCommunityNotice("");
     setCommunitySettingsOpen(true);
     await loadCommunityMembers();
   }
@@ -752,11 +753,12 @@ function Chat({ session, language, setLanguage }) {
   async function saveCommunity(e) {
     e.preventDefault();
     if (!selectedCommunity || communityBusy || !communityName.trim()) return;
-    setCommunityBusy(true); setCommunityError("");
+    setCommunityBusy(true); setCommunityError(""); setCommunityNotice("");
     const { error: saveError } = await supabase.rpc("update_community", {
       target_community_id: selectedCommunity.id, new_name: communityName.trim(), new_description: communityDescription.trim(),
     });
-    if (saveError) setCommunityError(saveError.message); else await loadCommunities(selectedCommunity.id);
+    if (saveError) setCommunityError(saveError.message);
+    else { await loadCommunities(selectedCommunity.id); setCommunityNotice(l("Detaliile comunității au fost salvate.", "Community details were saved.")); }
     setCommunityBusy(false);
   }
 
@@ -764,33 +766,33 @@ function Chat({ session, language, setLanguage }) {
     e.preventDefault();
     const emails = communityMemberEmails.split(/[,\n;]/).map((x) => x.trim().toLowerCase()).filter(Boolean);
     if (!selectedCommunity || !emails.length || communityBusy) return;
-    setCommunityBusy(true); setCommunityError("");
+    setCommunityBusy(true); setCommunityError(""); setCommunityNotice("");
     const { error: addError } = await supabase.rpc("add_community_members", {
       target_community_id: selectedCommunity.id, member_emails: emails,
     });
     if (addError) setCommunityError(addError.message);
-    else { setCommunityMemberEmails(""); await Promise.all([loadCommunityMembers(),loadCommunities(selectedCommunity.id)]); }
+    else { setCommunityMemberEmails(""); await Promise.all([loadCommunityMembers(),loadCommunities(selectedCommunity.id)]); setCommunityNotice(l("Membrii au fost adăugați în comunitate.", "Members were added to the community.")); }
     setCommunityBusy(false);
   }
 
   async function toggleCommunityAdmin(member) {
     if (!selectedCommunity || communityBusy || !window.confirm(member.is_admin ? l(`Retragi rolul de administrator pentru ${member.email}?`, `Remove administrator access from ${member.email}?`) : l(`Acordezi rolul de administrator lui ${member.email}?`, `Grant administrator access to ${member.email}?`))) return;
-    setCommunityBusy(true); setCommunityError("");
+    setCommunityBusy(true); setCommunityError(""); setCommunityNotice("");
     const { error: adminError } = await supabase.rpc("set_community_admin", {
       target_community_id: selectedCommunity.id,target_user_id: member.user_id,make_admin: !member.is_admin,
     });
-    if (adminError) setCommunityError(adminError.message); else await loadCommunityMembers();
+    if (adminError) setCommunityError(adminError.message); else { await loadCommunityMembers(); setCommunityNotice(l("Rolul membrului a fost actualizat.", "The member role was updated.")); }
     setCommunityBusy(false);
   }
 
   async function removeCommunityMember(member) {
     if (!selectedCommunity || communityBusy || !window.confirm(l(`Elimini ${member.email} din comunitate și din grupurile ei?`, `Remove ${member.email} from the community and its groups?`))) return;
-    setCommunityBusy(true); setCommunityError("");
+    setCommunityBusy(true); setCommunityError(""); setCommunityNotice("");
     const { error: removeError } = await supabase.rpc("remove_community_member", {
       target_community_id: selectedCommunity.id,target_user_id: member.user_id,
     });
     if (removeError) setCommunityError(removeError.message);
-    else await Promise.all([loadCommunityMembers(),loadCommunities(selectedCommunity.id),loadRooms()]);
+    else { await Promise.all([loadCommunityMembers(),loadCommunities(selectedCommunity.id),loadRooms()]); setCommunityNotice(l("Membrul a fost eliminat din comunitate.", "The member was removed from the community.")); }
     setCommunityBusy(false);
   }
 
@@ -1035,14 +1037,15 @@ function Chat({ session, language, setLanguage }) {
       <div className="brandRow"><div><p className="eyebrow">eClinTalk</p><h2>{t("myConversations")}</h2></div><div className="brandActions"><button className="mobileCloseBtn" onClick={() => setMobileMenuOpen(false)} aria-label={l("Închide meniul", "Close menu")}>×</button></div></div>
       <div className="communityNav">
         <button className={selectedCommunityId === "all" ? "selected" : ""} onClick={() => chooseCommunity("all")}>▦ {t("allConversations")}</button>
-        {communities.length > 0 && <div className="communityNavTitle"><strong>{t("communities")}</strong>{isGeneralAdmin && <button title={l("Comunitate nouă", "New community")} onClick={() => setCommunityModal(true)}>＋</button>}</div>}
+        <div className="communityNavTitle"><strong>{t("communities")}</strong>{isGeneralAdmin && <button title={l("Creează o comunitate", "Create a community")} aria-label={l("Creează o comunitate", "Create a community")} onClick={() => setCommunityModal(true)}>＋</button>}</div>
+        {communities.length === 0 && <p className="communityEmpty">{l("Nu faci parte încă dintr-o comunitate.", "You are not part of a community yet.")}</p>}
         {communities.map((item) => <button key={item.id} className={selectedCommunityId === item.id ? "selected" : ""} onClick={() => chooseCommunity(item.id)}>
           <span>◉</span><div><strong>{item.name}</strong><small>{item.group_count} {l("grupuri", "groups")} · {item.member_count} {t("members")}</small></div>
         </button>)}
         {rooms.some((item) => !item.community_id) && <button className={selectedCommunityId === "private" ? "selected" : ""} onClick={() => chooseCommunity("private")}>◇ {t("otherGroups")}</button>}
       </div>
-      {selectedCommunity?.my_is_admin && <button className="manageCommunityBtn" onClick={openCommunitySettings}>⚙ {l("Setările comunității", "Community settings")}</button>}
-      {canCreateGroup && <button className="primary newBtn" onClick={() => setModal(true)}>{t("newGroup")}</button>}
+      {selectedCommunity?.my_is_admin && <button className="manageCommunityBtn" onClick={openCommunitySettings}>👥 {l("Membri și setări", "Members and settings")}</button>}
+      {canCreateGroup && <button className="primary newBtn" onClick={() => setModal(true)}>{selectedCommunity ? l(`+ Grup nou în ${selectedCommunity.name}`, `+ New group in ${selectedCommunity.name}`) : t("newGroup")}</button>}
       <div className="conversationList">
         {loading && <p className="status">{t("loading")}</p>}
         {!loading && visibleRooms.length === 0 && <p className="emptySide">{l("Nu ai conversații în această secțiune.", "You have no conversations in this section.")}</p>}
@@ -1156,11 +1159,18 @@ function Chat({ session, language, setLanguage }) {
       <div className="dangerZone">{isOwner ? <button className="dangerBtn" disabled={settingsBusy} onClick={deleteConversation}>{l("Șterge conversația", "Delete conversation")}</button> : <button className="dangerBtn" disabled={settingsBusy} onClick={leaveConversation}>{l("Părăsește conversația", "Leave conversation")}</button>}</div>
     </section></div>}
     {communitySettingsOpen && selectedCommunity && <div className="modalBackdrop" onMouseDown={() => !communityBusy && setCommunitySettingsOpen(false)}><section className="modal manageModal" onMouseDown={(e) => e.stopPropagation()}>
-      <div className="modalTitle"><div><p className="eyebrow">{l("Comunitate", "Community")}</p><h2>{l("Setări", "Settings")}</h2></div><button className="iconBtn" disabled={communityBusy} onClick={() => setCommunitySettingsOpen(false)} aria-label={l("Închide", "Close")}>×</button></div>
+      <div className="modalTitle"><div><p className="eyebrow">{selectedCommunity.name}</p><h2>{l("Administrează comunitatea", "Manage community")}</h2></div><button className="iconBtn" disabled={communityBusy} onClick={() => setCommunitySettingsOpen(false)} aria-label={l("Închide", "Close")}>×</button></div>
+      <p className="communityIntro">{l("Adaugă mai întâi persoanele în comunitate. După aceea le poți include în grupurile comunității.", "Add people to the community first. You can then include them in its groups.")}</p>
       <form className="manageSection" onSubmit={saveCommunity}>
         <label>{l("Numele comunității", "Community name")}<input required maxLength={80} value={communityName} onChange={(e) => setCommunityName(e.target.value)} /></label>
         <label>{l("Descriere", "Description")}<textarea rows={2} maxLength={500} value={communityDescription} onChange={(e) => setCommunityDescription(e.target.value)} /></label>
         <button className="primary" disabled={communityBusy || !communityName.trim()}>{t("save")}</button>
+      </form>
+      <form className="manageSection" onSubmit={addCommunityMembers}>
+        <div className="sectionHeading"><strong>{l("Adaugă membri", "Add members")}</strong><small>{l("după email", "by email")}</small></div>
+        <label>{l("Adresele de email ale persoanelor", "People's email addresses")}<textarea rows={2} placeholder={l("nume@exemplu.ro, alt.nume@exemplu.ro", "name@example.com, another@example.com")} value={communityMemberEmails} onChange={(e) => setCommunityMemberEmails(e.target.value)} /></label>
+        <p className="helper">{l("Persoanele trebuie să aibă deja cont eClinTalk. Poți separa adresele prin virgulă sau le poți scrie pe rânduri diferite.", "People must already have an eClinTalk account. Separate addresses with commas or put them on separate lines.")}</p>
+        <button className="primary" disabled={communityBusy || !communityMemberEmails.trim()}>{l("Adaugă membrii", "Add members")}</button>
       </form>
       <div className="manageSection"><div className="sectionHeading"><strong>{l("Membrii comunității", "Community members")}</strong><small>{communityMembers.length}</small></div>
         <div className="memberList">{communityMembers.map((member) => <div className="memberRow" key={member.user_id}><div><strong>{member.display_name || member.email}</strong><small>{member.email} · {member.is_admin ? l("Administrator de comunitate", "Community administrator") : l("Membru", "Member")}</small></div>
@@ -1168,11 +1178,7 @@ function Chat({ session, language, setLanguage }) {
           {member.user_id !== session.user.id && (!member.is_admin || isGeneralAdmin) && <button disabled={communityBusy} onClick={() => removeCommunityMember(member)}>{l("Elimină", "Remove")}</button>}</div>
         </div>)}</div>
       </div>
-      <form className="manageSection" onSubmit={addCommunityMembers}>
-        <label>{l("Adaugă membri", "Add members")}<textarea rows={2} placeholder="user@example.com" value={communityMemberEmails} onChange={(e) => setCommunityMemberEmails(e.target.value)} /></label>
-        <p className="helper">{l("Persoanele trebuie să aibă deja cont. Adresele pot fi separate prin virgulă.", "People must already have an account. Separate addresses with commas.")}</p>
-        <button className="primary" disabled={communityBusy || !communityMemberEmails.trim()}>{l("Adaugă în comunitate", "Add to community")}</button>
-      </form>
+      {communityNotice && <p className="success communityNotice">{communityNotice}</p>}
       {communityError && <p className="error manageError">{communityError}</p>}
       {isGeneralAdmin && <div className="dangerZone"><button className="dangerBtn" disabled={communityBusy} onClick={deleteCommunity}>{l("Șterge comunitatea", "Delete community")}</button></div>}
     </section></div>}

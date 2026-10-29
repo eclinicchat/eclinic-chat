@@ -1,4 +1,8 @@
-# eClinTalk v1.10.0
+# eClinTalk v1.11.0
+
+Versiunea v1.11.0 clarifica administrarea comunitatilor. Sectiunea „Comunitatile mele” este afisata permanent, grupurile din afara comunitatilor sunt denumite explicit, iar administratorii au un buton vizibil „Membri si setari”. Fereastra de administrare explica fluxul corect, plaseaza adaugarea membrilor inaintea listei existente si confirma vizibil actiunile reusite. Butonul pentru grup nou arata comunitatea in care va fi creat grupul.
+
+Actualizarea nu necesita niciun script SQL nou.
 
 Versiunea v1.10.0 imbunatateste salvarea si completarea credentialelor pe Mac, Windows, iPhone si Android. Formularul foloseste identificatori separati si stabili pentru autentificare si creare cont, citeste corect valorile completate automat de browser si solicita explicit salvarea credentialelor in browserele care ofera Credential Management API. Safari si iCloud Passwords folosesc in continuare marcajele standard `username` si `current-password`, conform regulilor Apple. Managerul de parole si utilizatorul pastreaza controlul final asupra salvarii.
 
