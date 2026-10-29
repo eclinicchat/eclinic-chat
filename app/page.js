@@ -73,6 +73,21 @@ function urlBase64ToUint8Array(value) {
   return Uint8Array.from([...raw].map((character) => character.charCodeAt(0)));
 }
 
+async function requestPasswordManagerSave(email, password) {
+  if (typeof window === "undefined" || !window.PasswordCredential || !navigator.credentials?.store) return;
+  try {
+    const credential = new window.PasswordCredential({
+      id: email,
+      name: email,
+      password,
+    });
+    await navigator.credentials.store(credential);
+  } catch {
+    // Safari/iCloud Passwords and password managers without this API use the
+    // semantic form attributes below and keep control of their own prompts.
+  }
+}
+
 function Login({ language, setLanguage }) {
   const t = translator(language);
   const [signup, setSignup] = useState(false);
@@ -85,17 +100,27 @@ function Login({ language, setLanguage }) {
 
   async function submit(e) {
     e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const submittedEmail = String(formData.get("email") || email).trim().toLowerCase();
+    const submittedPassword = String(formData.get("password") || password);
     setBusy(true);
     setNotice(null);
-    const result = signup
-      ? await supabase.auth.signUp({ email, password })
-      : await supabase.auth.signInWithPassword({ email, password });
-    if (result.error) setNotice({ error: true, text: result.error.message });
-    else if (signup && !result.data.session) {
-      setNotice({ text: language === "en" ? "Account created. Check your email, then sign in." : "Cont creat. Verifică emailul, apoi conectează-te." });
-      setSignup(false);
+    try {
+      const result = signup
+        ? await supabase.auth.signUp({ email: submittedEmail, password: submittedPassword })
+        : await supabase.auth.signInWithPassword({ email: submittedEmail, password: submittedPassword });
+      if (result.error) setNotice({ error: true, text: result.error.message });
+      else if (signup && !result.data.session) {
+        setNotice({ text: language === "en" ? "Account created. Check your email, then sign in." : "Cont creat. Verifică emailul, apoi conectează-te." });
+        setSignup(false);
+      } else {
+        await requestPasswordManagerSave(submittedEmail, submittedPassword);
+      }
+    } catch {
+      setNotice({ error: true, text: language === "en" ? "The authentication service could not be reached. Please try again." : "Serviciul de autentificare nu poate fi contactat. Încearcă din nou." });
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   }
 
   async function sendResetLink(e) {
@@ -116,13 +141,13 @@ function Login({ language, setLanguage }) {
     <p className="appName">eClinTalk</p>
     <h1>{forgotPassword ? (language === "en" ? "Reset password" : "Recuperează parola") : signup ? (language === "en" ? "Create account" : "Creează cont") : t("secureSignIn")}</h1>
     <p className="muted">{t("privateHelp")}</p>
-    {forgotPassword ? <form onSubmit={sendResetLink} className="form" autoComplete="on">
+    {forgotPassword ? <form id="recovery-form" name="recovery" onSubmit={sendResetLink} className="form" autoComplete="on" method="post">
       <label htmlFor="recovery-email">{t("email")}<input id="recovery-email" name="email" type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
       {notice && <p className={notice.error ? "error" : "success"}>{notice.text}</p>}
       <button disabled={busy} className="primary">{busy ? (language === "en" ? "Sending..." : "Se trimite...") : (language === "en" ? "Send recovery link" : "Trimite linkul de recuperare")}</button>
-    </form> : <form onSubmit={submit} className="form" autoComplete="on">
-      <label htmlFor="email">{t("email")}<input id="email" name="email" type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="username" enterKeyHint="next" autoFocus required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
-      <label htmlFor="password">{t("password")}<span className="passwordField"><input id="password" name="password" type={showPassword ? "text" : "password"} autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete={signup ? "new-password" : "current-password"} enterKeyHint="go" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} /><button type="button" className="passwordToggle" aria-label={showPassword ? (language === "en" ? "Hide password" : "Ascunde parola") : (language === "en" ? "Show password" : "Arată parola")} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? "🙈" : "👁️"}</button></span></label>
+    </form> : <form id={signup ? "signup-form" : "login-form"} name={signup ? "signup" : "login"} onSubmit={submit} className="form" autoComplete="on" method="post">
+      <label htmlFor={signup ? "signup-email" : "login-email"}>{t("email")}<input id={signup ? "signup-email" : "login-email"} name="email" type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="username" enterKeyHint="next" autoFocus required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+      <label htmlFor={signup ? "new-password" : "current-password"}>{t("password")}<span className="passwordField"><input id={signup ? "new-password" : "current-password"} name="password" type={showPassword ? "text" : "password"} autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete={signup ? "new-password" : "current-password"} enterKeyHint="go" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} /><button type="button" className="passwordToggle" aria-label={showPassword ? (language === "en" ? "Hide password" : "Ascunde parola") : (language === "en" ? "Show password" : "Arată parola")} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? "🙈" : "👁️"}</button></span></label>
       {notice && <p className={notice.error ? "error" : "success"}>{notice.text}</p>}
       <button type="submit" disabled={busy} className="primary">{busy ? t("processing") : signup ? (language === "en" ? "Create account" : "Creează cont") : t("enterApp")}</button>
       {!signup && <p className="passwordHelp">{language === "en" ? "Saved credentials are securely filled and managed by your device's password manager." : "Datele salvate sunt completate și administrate în siguranță de managerul de parole al dispozitivului."}</p>}

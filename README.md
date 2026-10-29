@@ -1,4 +1,8 @@
-# eClinTalk v1.9.2
+# eClinTalk v1.10.0
+
+Versiunea v1.10.0 imbunatateste salvarea si completarea credentialelor pe Mac, Windows, iPhone si Android. Formularul foloseste identificatori separati si stabili pentru autentificare si creare cont, citeste corect valorile completate automat de browser si solicita explicit salvarea credentialelor in browserele care ofera Credential Management API. Safari si iCloud Passwords folosesc in continuare marcajele standard `username` si `current-password`, conform regulilor Apple. Managerul de parole si utilizatorul pastreaza controlul final asupra salvarii.
+
+Actualizarea nu necesita niciun script SQL nou. Incarca toate fisierele acestei versiuni in GitHub si asteapta publicarea Vercel cu starea **Ready**.
 
 Versiunea v1.9.2 include toate corectiile cumulative pentru notificari persistente, interfata RO/EN si compatibilitatea formularului de autentificare cu managerii de parole ai dispozitivelor.
 
