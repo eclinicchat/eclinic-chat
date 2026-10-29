@@ -1,19 +1,45 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 
 const time = (value, language = "ro") => new Date(value).toLocaleTimeString(language === "en" ? "en-GB" : "ro-RO", { hour: "2-digit", minute: "2-digit" });
 const localize = (language, ro, en) => language === "en" ? en : ro;
 const INACTIVITY_MS = 15 * 60 * 1000;
 const WARNING_MS = 60 * 1000;
-const QUICK_EMOJIS = [
-  "😀", "😃", "😄", "😁", "😂", "🤣", "😊", "😍", "🥰", "😘",
-  "😎", "🤩", "🤔", "🙄", "😮", "😢", "😭", "😡", "🤗", "🤝",
-  "👍", "👎", "👏", "🙌", "🙏", "💪", "❤️", "💙", "💚", "🔥",
-  "🎉", "✅", "❌", "⚠️", "📌", "💡", "👀", "💯", "🚑", "🏥",
+const EMOJI_CATEGORIES = [
+  { id: "faces", ro: "Expresii", en: "Faces", icon: "😊", items: ["😀","😃","😄","😁","😂","🤣","😊","😇","🙂","🙃","😉","😍","🥰","😘","😎","🤩","🤔","🫡","🙄","😮","😢","😭","😡","🤗","😴","🥳"] },
+  { id: "gestures", ro: "Gesturi", en: "Gestures", icon: "👍", items: ["👍","👎","👏","🙌","🙏","🤝","💪","👌","✌️","🤞","🫶","👋","☝️","💬","👀","🧠"] },
+  { id: "symbols", ro: "Simboluri", en: "Symbols", icon: "❤️", items: ["❤️","💙","💚","🧡","💜","🤍","🔥","✨","🎉","✅","❌","⚠️","📌","💡","💯","⭐","❗","❓"] },
+  { id: "medical", ro: "Medical", en: "Medical", icon: "🩺", items: ["🩺","🏥","🚑","💊","💉","🩻","🧬","🧪","🦠","🫀","🫁","🧠","🩹","📋","📷","🔬"] },
 ];
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "🤣", "😮", "😢", "👏", "🙏", "🔥", "✅", "👀", "💯"];
+
+function Icon({ name, size = 18 }) {
+  const paths = {
+    search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></>,
+    settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></>,
+    pin: <path d="m14 4 6 6-3 1-4 4-1 5-3-3-5 3 3-5 4-4 1-3Z"/>,
+    reply: <><path d="m9 17-5-5 5-5"/><path d="M4 12h10a6 6 0 0 1 6 6"/></>,
+    smile: <><circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01"/></>,
+    attachment: <path d="m20.5 11.5-8.9 8.9a6 6 0 0 1-8.5-8.5l9.4-9.4a4 4 0 0 1 5.7 5.7l-9.4 9.4a2 2 0 0 1-2.8-2.8l8.8-8.8"/>,
+    send: <><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></>,
+    trash: <><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13"/><path d="M10 11v5M14 11v5"/></>,
+    users: <><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v2"/><path d="M16 4a3 3 0 0 1 0 6M17 13a5 5 0 0 1 4 5v2"/></>,
+    menu: <path d="M4 7h16M4 12h16M4 17h16"/>,
+    close: <path d="m6 6 12 12M18 6 6 18"/>,
+  };
+  return <svg className="uiIcon" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>;
+}
+
+function dayLabel(value, language) {
+  const date = new Date(value);
+  const today = new Date();
+  const yesterday = new Date(); yesterday.setDate(today.getDate()-1);
+  if (date.toDateString() === today.toDateString()) return language === "en" ? "Today" : "Astăzi";
+  if (date.toDateString() === yesterday.toDateString()) return language === "en" ? "Yesterday" : "Ieri";
+  return date.toLocaleDateString(language === "en" ? "en-GB" : "ro-RO", { day:"numeric", month:"long", year: date.getFullYear() === today.getFullYear() ? undefined : "numeric" });
+}
 
 const UI = {
   ro: {
@@ -317,6 +343,8 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
   const [draft, setDraft] = useState("");
   const [replyTo, setReplyTo] = useState(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [emojiCategory, setEmojiCategory] = useState("faces");
+  const [recentEmojis, setRecentEmojis] = useState([]);
   const [reactionTarget, setReactionTarget] = useState(null);
   const [pinnedOpen, setPinnedOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -347,6 +375,8 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
   const [logoutWarning, setLogoutWarning] = useState(false);
   const [logoutCountdown, setLogoutCountdown] = useState(60);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [roomSearch, setRoomSearch] = useState("");
+  const [unreadBoundaryId, setUnreadBoundaryId] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileName, setProfileName] = useState("");
   const [profileBusy, setProfileBusy] = useState(false);
@@ -359,9 +389,12 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
   const warningTimer = useRef(null);
   const countdownTimer = useRef(null);
   const previousRoomId = useRef(null);
+  const draftRoomId = useRef(null);
+  const currentDraft = useRef("");
   const room = rooms.find((x) => x.id === roomId);
   const selectedCommunity = communities.find((x) => x.id === selectedCommunityId);
   const visibleRooms = rooms.filter((item) => selectedCommunityId === "all" ? true : selectedCommunityId === "private" ? !item.community_id : item.community_id === selectedCommunityId);
+  const filteredVisibleRooms = visibleRooms.filter((item) => !roomSearch.trim() || `${item.title} ${item.community_name || ""}`.toLocaleLowerCase().includes(roomSearch.trim().toLocaleLowerCase()));
   const canCreateGroup = selectedCommunityId === "private"
     ? isGeneralAdmin
     : isGeneralAdmin || communities.some((item) => item.my_is_admin);
@@ -379,6 +412,8 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
       const emailName = (member.email || "").split("@")[0].toLocaleLowerCase();
       return !mentionQuery || name.includes(mentionQuery) || emailName.includes(mentionQuery);
     }).slice(0, 6) : [];
+  const emojiTabs = recentEmojis.length ? [{ id:"recent",ro:"Recente",en:"Recent",icon:"🕘",items:recentEmojis },...EMOJI_CATEGORIES] : EMOJI_CATEGORIES;
+  const activeEmojiItems = emojiTabs.find((category) => category.id === emojiCategory)?.items || emojiTabs[0].items;
 
   function chooseCommunity(id) {
     setSelectedCommunityId(id);
@@ -516,12 +551,33 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
 
   useEffect(() => {
     loadRooms(); loadCommunities();
+    try { setRecentEmojis(JSON.parse(window.localStorage.getItem("eclintalk-recent-emojis") || "[]").slice(0,12)); } catch { setRecentEmojis([]); }
     supabase.from("profiles").select("display_name, preferred_language").eq("user_id", session.user.id).maybeSingle()
       .then(({ data }) => {
         if (data?.display_name) setProfileName(data.display_name);
         if (data?.preferred_language) setLanguage(data.preferred_language);
       });
   }, []);
+  useEffect(() => {
+    currentDraft.current = draft;
+    const activeRoom = draftRoomId.current;
+    if (!activeRoom) return;
+    const key = `eclintalk-draft:${session.user.id}:${activeRoom}`;
+    if (draft) window.localStorage.setItem(key,draft); else window.localStorage.removeItem(key);
+  }, [draft]);
+  useEffect(() => {
+    const previousRoom = draftRoomId.current;
+    if (previousRoom) {
+      const previousKey = `eclintalk-draft:${session.user.id}:${previousRoom}`;
+      if (currentDraft.current) window.localStorage.setItem(previousKey,currentDraft.current); else window.localStorage.removeItem(previousKey);
+    }
+    const nextDraft = roomId ? window.localStorage.getItem(`eclintalk-draft:${session.user.id}:${roomId}`) || "" : "";
+    draftRoomId.current = roomId;
+    currentDraft.current = nextDraft;
+    setDraft(nextDraft);
+    setReplyTo(null); setAttachment(null); setEmojiOpen(false);
+    if (fileInput.current) fileInput.current.value = "";
+  }, [roomId]);
   useEffect(() => {
     if (!inviteToken) return;
     let active = true;
@@ -576,7 +632,7 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
     return () => { active = false; };
   }, [roomId]);
   useEffect(() => {
-    if (!roomId || unlockedRoomId !== roomId) { setMessages([]); setReactions([]); return; }
+    if (!roomId || unlockedRoomId !== roomId) { setMessages([]); setReactions([]); setUnreadBoundaryId(null); return; }
     let active = true;
     setMessages([]);
     setReactions([]);
@@ -587,7 +643,12 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
     ]).then(([messageResult, reactionResult]) => {
         if (!active) return;
         if (messageResult.error) setError(l("Mesajele nu au putut fi încărcate.", "Messages could not be loaded."));
-        else setMessages(messageResult.data || []);
+        else {
+          const list = messageResult.data || [];
+          const unreadCount = rooms.find((item) => item.id === roomId)?.unread_count || 0;
+          setUnreadBoundaryId(unreadCount > 0 ? list[Math.max(0,list.length-unreadCount)]?.id || null : null);
+          setMessages(list);
+        }
         if (!reactionResult.error) setReactions(reactionResult.data || []);
         supabase.rpc("mark_conversation_read", { target_conversation_id: roomId }).then(() => loadRooms(roomId));
       });
@@ -675,6 +736,11 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
 
   function insertEmoji(emoji) {
     setDraft((current) => `${current}${emoji}`);
+    setRecentEmojis((current) => {
+      const next = [emoji,...current.filter((item) => item!==emoji)].slice(0,12);
+      window.localStorage.setItem("eclintalk-recent-emojis",JSON.stringify(next));
+      return next;
+    });
   }
 
   function groupedReactions(messageId) {
@@ -1117,13 +1183,14 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
         </button>)}
         {rooms.some((item) => !item.community_id) && <button className={selectedCommunityId === "private" ? "selected" : ""} onClick={() => chooseCommunity("private")}>◇ {t("otherGroups")}</button>}
       </div>
-      {selectedCommunity?.my_is_admin && <button className="manageCommunityBtn" onClick={openCommunitySettings}>👥 {l("Membri și setări", "Members and settings")}</button>}
+      {selectedCommunity?.my_is_admin && <button className="manageCommunityBtn" onClick={openCommunitySettings}><Icon name="users" size={16}/>{l("Membri și setări", "Members and settings")}</button>}
       {canCreateGroup && <button className="primary newBtn" onClick={() => setModal(true)}>{selectedCommunity ? l(`+ Grup nou în ${selectedCommunity.name}`, `+ New group in ${selectedCommunity.name}`) : t("newGroup")}</button>}
+      <label className="roomSearch"><Icon name="search" size={16}/><input value={roomSearch} onChange={(event) => setRoomSearch(event.target.value)} placeholder={l("Caută grupuri", "Search groups")} aria-label={l("Caută grupuri", "Search groups")} /></label>
       <div className="conversationList">
         {loading && <p className="status">{t("loading")}</p>}
-        {!loading && visibleRooms.length === 0 && <p className="emptySide">{l("Nu ai conversații în această secțiune.", "You have no conversations in this section.")}</p>}
-        {visibleRooms.map((item) => <button className={`conv ${item.id === roomId ? "active" : ""}`} key={item.id} onClick={() => chooseRoom(item.id)}>
-          <span>{item.title.slice(0, 2).toUpperCase()}</span><div><strong>{item.is_pinned && "📌 "}{item.title}</strong><small>{item.member_count} {t("members")} · {item.community_name || t("groupWithoutCommunity")}</small></div>
+        {!loading && filteredVisibleRooms.length === 0 && <p className="emptySide">{roomSearch ? l("Niciun grup nu corespunde căutării.", "No groups match your search.") : l("Nu ai conversații în această secțiune.", "You have no conversations in this section.")}</p>}
+        {filteredVisibleRooms.map((item) => <button className={`conv ${item.id === roomId ? "active" : ""}`} key={item.id} onClick={() => chooseRoom(item.id)}>
+          <span>{item.title.slice(0, 2).toUpperCase()}</span><div><strong>{item.is_pinned && <Icon name="pin" size={12}/>} {item.title}</strong><small>{item.member_count} {t("members")} · {item.community_name || t("groupWithoutCommunity")}</small></div>
           {!item.password_protected && item.unread_count > 0 && <i className="unreadBadge">{item.unread_count > 99 ? "99+" : item.unread_count}</i>}
         </button>)}
       </div>
@@ -1132,12 +1199,12 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
     {mobileMenuOpen && <button className="sideBackdrop" onClick={() => setMobileMenuOpen(false)} aria-label={l("Închide meniul", "Close menu")} />}
     {inviteStatus && <div className="inviteToast"><span>{inviteStatus}</span><button onClick={() => setInviteStatus("")} aria-label={l("Închide", "Close")}>×</button></div>}
     <section className={`chat ${room ? "" : "chatEmpty"}`}>
-      {room ? <><header><button className="mobileMenuBtn" onClick={() => setMobileMenuOpen(true)} aria-controls="group-menu" aria-expanded={mobileMenuOpen}>☰</button><div className="headerMain"><strong>{room.title}</strong><small>{room.member_count} {t("members")} · {room.community_name || t("groupWithoutCommunity")} · {l("numai membrii au acces", "members only")}</small></div><div className="headerActions"><b>● {l("Privat", "Private")}</b><button onClick={toggleGroupPin}>{room.is_pinned ? t("pinned") : t("pin")}</button><button onClick={openSettings}>{t("settings")}</button></div></header>
+      {room ? <><header><button className="mobileMenuBtn iconTextBtn" onClick={() => setMobileMenuOpen(true)} aria-controls="group-menu" aria-expanded={mobileMenuOpen}><Icon name="menu"/><span className="srOnly">{l("Meniu", "Menu")}</span></button><div className="headerMain"><strong>{room.title}</strong><small>{room.member_count} {t("members")} · {room.community_name || t("groupWithoutCommunity")} · {l("numai membrii au acces", "members only")}</small></div><div className="headerActions"><b>● {l("Privat", "Private")}</b><button className="iconTextBtn" onClick={toggleGroupPin}><Icon name="pin" size={16}/>{room.is_pinned ? l("Fixat", "Pinned") : "Pin"}</button><button className="iconTextBtn" onClick={openSettings}><Icon name="settings" size={16}/>{l("Setări", "Settings")}</button></div></header>
         <div className="warning">{t("testWarning")}</div>
         <div className="msgs">
           {pinnedMessages.length > 0 && <div className="pinnedArea">
             <button className="pinnedBanner" onClick={() => pinnedMessages.length === 1 ? scrollToMessage(pinnedMessages[0].id) : setPinnedOpen(!pinnedOpen)}>
-              <span className="largePin">📌</span><span>{pinnedMessages.length} {pinnedMessages.length === 1 ? l("mesaj fixat", "pinned message") : l("mesaje fixate", "pinned messages")}</span><span className="pinChevron">{pinnedMessages.length > 1 ? (pinnedOpen ? "▲" : "▼") : "›"}</span>
+              <Icon name="pin" size={17}/><span>{pinnedMessages.length} {pinnedMessages.length === 1 ? l("mesaj fixat", "pinned message") : l("mesaje fixate", "pinned messages")}</span><span className="pinChevron">{pinnedMessages.length > 1 ? (pinnedOpen ? "▲" : "▼") : "›"}</span>
             </button>
             {pinnedOpen && pinnedMessages.length > 1 && <div className="pinnedList">
               {pinnedMessages.map((item, index) => <button key={item.id} onClick={() => scrollToMessage(item.id)}>
@@ -1146,11 +1213,14 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
             </div>}
           </div>}
           {messages.length === 0 && !error && <p className="status">{l("Trimite primul mesaj.", "Send the first message.")}</p>}
-          {messages.map((item) => { const mine = item.user_id === session.user.id; const replied = messages.find((x) => x.id === item.reply_to_id); const itemReactions = groupedReactions(item.id); return <div ref={(node) => { messageRefs.current[item.id] = node; }} key={item.id} className={`messageWrap ${mine ? "mine" : ""}`}>
+          {messages.map((item,index) => { const mine = item.user_id === session.user.id; const replied = messages.find((x) => x.id === item.reply_to_id); const itemReactions = groupedReactions(item.id); const showDay = index===0 || new Date(messages[index-1].created_at).toDateString()!==new Date(item.created_at).toDateString(); return <Fragment key={item.id}>
+            {showDay && <div className="dayDivider"><span>{dayLabel(item.created_at,language)}</span></div>}
+            {item.id===unreadBoundaryId && <div className="unreadDivider"><span>{l("Mesaje noi", "New messages")}</span></div>}
+            <div ref={(node) => { messageRefs.current[item.id] = node; }} className={`messageWrap ${mine ? "mine" : ""}`}>
             <div className={`bubble ${mine ? "mine" : ""} ${item.attachment_path ? "hasImage" : ""} ${item.pinned_at ? "pinnedMessage" : ""} ${item.deleted_at ? "deletedMessage" : ""}`}>
               {item.deleted_at ? <p className="deletedText">{l("Mesaj șters", "Deleted message")}</p> : <>
                 {!mine && <strong className="sender">{displayNameForUser(item.user_id, item.sender_email)}</strong>}
-                {item.pinned_at && <span className="pinMark">📌</span>}
+                {item.pinned_at && <span className="pinMark"><Icon name="pin" size={14}/></span>}
                 {item.reply_to_id && <button className="replyQuote" onClick={() => scrollToMessage(item.reply_to_id)}>
                   <strong>{replied ? displayNameForUser(replied.user_id, replied.sender_email) : l("Mesaj anterior", "Previous message")}</strong><span>{replied?.deleted_at ? l("Mesaj șters", "Deleted message") : replied?.body || (replied?.attachment_path ? l("📷 Imagine", "📷 Image") : l("Mesaj indisponibil", "Message unavailable"))}</span>
                   {!replied?.deleted_at && replied?.attachment_path && imageUrls[replied.attachment_path] && <img src={imageUrls[replied.attachment_path]} alt={l("Imagine citată", "Quoted image")} />}
@@ -1160,28 +1230,28 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
                 {item.body && <p><LinkifiedText text={item.body} /></p>}
               </>}<small>{time(item.created_at, language)}</small>
             </div>
-            {!item.deleted_at && <div className="messageActions"><button onClick={() => setReplyTo(item)}><span>↩</span> {l("Răspunde", "Reply")}</button><button onClick={() => setReactionTarget(reactionTarget === item.id ? null : item.id)}><span>☺</span> {l("Reacție", "React")}</button>
-              {room.my_is_admin && <button onClick={() => toggleMessagePin(item.id)}><span>📌</span> {item.pinned_at ? l("Anulează pin", "Unpin") : "Pin"}</button>}
-              {(mine || room.my_is_admin) && <button className="deleteMessageBtn" disabled={deletingMessageId === item.id} onClick={() => deleteMessage(item)}><span>🗑</span> {deletingMessageId === item.id ? l("Se șterge...", "Deleting...") : l("Șterge", "Delete")}</button>}</div>}
+            {!item.deleted_at && <div className="messageActions"><button onClick={() => setReplyTo(item)}><Icon name="reply" size={15}/>{l("Răspunde", "Reply")}</button><button onClick={() => setReactionTarget(reactionTarget === item.id ? null : item.id)}><Icon name="smile" size={15}/>{l("Reacție", "React")}</button>
+              {room.my_is_admin && <button onClick={() => toggleMessagePin(item.id)}><Icon name="pin" size={15}/>{item.pinned_at ? l("Anulează pin", "Unpin") : "Pin"}</button>}
+              {(mine || room.my_is_admin) && <button className="deleteMessageBtn" disabled={deletingMessageId === item.id} onClick={() => deleteMessage(item)}><Icon name="trash" size={15}/>{deletingMessageId === item.id ? l("Se șterge...", "Deleting...") : l("Șterge", "Delete")}</button>}</div>}
             {!item.deleted_at && reactionTarget === item.id && <div className="reactionPicker">{REACTION_EMOJIS.map((emoji) => <button key={emoji} onClick={() => reactToMessage(item.id, emoji)}>{emoji}</button>)}</div>}
             {!item.deleted_at && Object.keys(itemReactions).length > 0 && <div className="reactionSummary">{Object.entries(itemReactions).map(([emoji, info]) => <button className={info.mine ? "mine" : ""} key={emoji} onClick={() => reactToMessage(item.id, emoji)}>{emoji} {info.count}</button>)}</div>}
-          </div>; })}<div ref={bottom} />
+          </div></Fragment>; })}<div ref={bottom} />
         </div>
         <div>{error && <p className="chatError">{error}</p>}<form className="composer" onSubmit={send}>
 	          {replyTo && <div className="selectedReply"><div><strong>{l("Răspuns către", "Reply to")} {displayNameForUser(replyTo.user_id, replyTo.sender_email)}</strong><span>{replyTo.body || (replyTo.attachment_path ? l("📷 Imagine", "📷 Image") : l("Mesaj", "Message"))}</span></div>{replyTo.attachment_path && imageUrls[replyTo.attachment_path] && <img src={imageUrls[replyTo.attachment_path]} alt={l("Imagine selectată pentru răspuns", "Image selected for reply")} />}<button type="button" onClick={() => setReplyTo(null)}>×</button></div>}
           <input ref={fileInput} className="fileInput" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" onChange={chooseFile} />
-          <button className="attachBtn" type="button" onClick={() => fileInput.current?.click()} disabled={sending} title={l("Atașează imagine", "Attach image")} aria-label={l("Atașează imagine", "Attach image")}>📎</button>
-          <button className="emojiBtn" type="button" onClick={() => setEmojiOpen(!emojiOpen)} disabled={sending} title={l("Emoticoane", "Emoji")} aria-label={l("Emoticoane", "Emoji")}>☺</button>
+          <button className="attachBtn" type="button" onClick={() => fileInput.current?.click()} disabled={sending} title={l("Atașează imagine", "Attach image")} aria-label={l("Atașează imagine", "Attach image")}><Icon name="attachment" size={20}/></button>
+          <button className={`emojiBtn ${emojiOpen ? "active" : ""}`} type="button" onClick={() => setEmojiOpen(!emojiOpen)} disabled={sending} title={l("Emoticoane", "Emoji")} aria-label={l("Emoticoane", "Emoji")}><Icon name="smile" size={20}/></button>
 	          <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={t("messagePlaceholder")} maxLength={4000} disabled={sending} autoComplete="off" />
-	          <button className="primary" disabled={sending || (!draft.trim() && !attachment)}>{sending ? t("sending") : t("send")}</button>
+	          <button className="primary sendBtn iconTextBtn" disabled={sending || (!draft.trim() && !attachment)}><Icon name="send" size={17}/><span>{sending ? t("sending") : t("send")}</span></button>
 	          {mentionMatch && <div className="mentionPicker" role="listbox" aria-label={t("mentionHint")}>
 	            {mentionSuggestions.length ? mentionSuggestions.map((member) => <button type="button" key={member.user_id} onClick={() => insertMention(member)}><span className="mentionAvatar">{(member.display_name || member.email).slice(0, 2).toUpperCase()}</span><span><strong>{member.display_name || member.email.split("@")[0]}</strong><small>{member.email}</small></span></button>) : <p>{language === "en" ? "No matching member" : "Niciun membru găsit"}</p>}
 	          </div>}
-          {emojiOpen && <div className="emojiPicker">{QUICK_EMOJIS.map((emoji) => <button type="button" key={emoji} onClick={() => insertEmoji(emoji)}>{emoji}</button>)}</div>}
+          {emojiOpen && <div className="emojiPicker"><div className="emojiTabs">{emojiTabs.map((category) => <button className={emojiCategory===category.id ? "active" : ""} type="button" key={category.id} onClick={() => setEmojiCategory(category.id)} title={l(category.ro,category.en)}>{category.icon}<span>{l(category.ro,category.en)}</span></button>)}</div><div className="emojiGrid">{activeEmojiItems.map((emoji) => <button type="button" key={emoji} onClick={() => insertEmoji(emoji)}>{emoji}</button>)}</div></div>}
           {attachment && <div className="selectedFile"><span>{attachment.name}</span><button type="button" onClick={() => { setAttachment(null); if (fileInput.current) fileInput.current.value = ""; }}>×</button></div>}
         </form></div></> :
-	        <><div className="mobileWelcomeBar"><button className="mobileMenuBtn" onClick={() => setMobileMenuOpen(true)} aria-controls="group-menu" aria-expanded={mobileMenuOpen}>☰ <span>{t("myConversations")}</span></button></div><div className="welcome conversationHome"><div className="logo">eC</div><h2>{selectedCommunity?.name || t("yourConversations")}</h2><p>{visibleRooms.length ? t("chooseConversation") : t("noConversations")}</p>
-	          {visibleRooms.length > 0 && <div className="homeConversationList">{visibleRooms.map((item) => <button key={item.id} onClick={() => chooseRoom(item.id)}><span>{item.title.slice(0,2).toUpperCase()}</span><div><strong>{item.is_pinned && "📌 "}{item.title}</strong><small>{item.member_count} {t("members")} · {item.community_name || t("groupWithoutCommunity")}</small></div>{!item.password_protected && item.unread_count > 0 && <i className="unreadBadge">{item.unread_count > 99 ? "99+" : item.unread_count}</i>}</button>)}</div>}
+	        <><div className="mobileWelcomeBar"><button className="mobileMenuBtn iconTextBtn" onClick={() => setMobileMenuOpen(true)} aria-controls="group-menu" aria-expanded={mobileMenuOpen}><Icon name="menu"/><span>{t("myConversations")}</span></button></div><div className="welcome conversationHome"><div className="logo">eC</div><h2>{selectedCommunity?.name || t("yourConversations")}</h2><p>{visibleRooms.length ? t("chooseConversation") : t("noConversations")}</p>
+	          {visibleRooms.length > 0 && <div className="homeConversationList">{visibleRooms.map((item) => <button key={item.id} onClick={() => chooseRoom(item.id)}><span>{item.title.slice(0,2).toUpperCase()}</span><div><strong>{item.is_pinned && <Icon name="pin" size={12}/>} {item.title}</strong><small>{item.member_count} {t("members")} · {item.community_name || t("groupWithoutCommunity")}</small></div>{!item.password_protected && item.unread_count > 0 && <i className="unreadBadge">{item.unread_count > 99 ? "99+" : item.unread_count}</i>}</button>)}</div>}
 	          {!visibleRooms.length && canCreateGroup && <button className="primary" onClick={() => setModal(true)}>{t("firstGroup")}</button>}{error && <p className="chatError">{error}</p>}</div></>}
     </section>
     {modal && <NewConversation language={language} close={() => setModal(false)} communities={communities} selectedCommunityId={selectedCommunityId} isGeneralAdmin={isGeneralAdmin} created={(id) => { setModal(false); loadRooms(id); loadCommunities(); }} />}

@@ -1,6 +1,8 @@
-# eClinTalk v1.12.0
+# eClinTalk v1.13.0
 
-Versiunea v1.12.0 adauga invitatii prin link pentru comunitati si grupuri. Administratorul poate introduce o adresa de email chiar daca persoana nu are inca un cont, poate selecta grupurile dorite si poate copia un link valabil 7 zile. Dupa crearea contului sau autentificare, invitatia este acceptata automat. Conturile deja existente sunt adaugate imediat.
+Versiunea v1.13.0 aduce o interfata vizuala mai unitara si mai profesionala: tipografie si culori simplificate, iconuri consecvente, meniu lateral si ferestre reorganizate, mesaje si controale mai curate. Include cautarea rapida a grupurilor, draft separat pentru fiecare conversatie, delimitatoare de data si mesaje noi, reply cu miniatura pentru imagini si un selector extins de emoticoane organizat pe categorii, cu lista recenta.
+
+Sistemul de invitatii din v1.12 ramane activ. Administratorul poate introduce o adresa de email chiar daca persoana nu are inca un cont, poate selecta grupurile dorite si poate copia un link valabil 7 zile.
 
 Inainte de folosirea invitatiilor, ruleaza integral `supabase-invitations-v1.12.sql` in Supabase SQL Editor.
 
