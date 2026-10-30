@@ -181,20 +181,20 @@ function Login({ language, setLanguage, inviteToken }) {
     setBusy(false);
   }
 
-  return <main className="loginShell"><section className="loginCard">
-    <div className="loginTop"><div className="logo">eC</div><div className="languageSwitch"><button className={language === "ro" ? "active" : ""} onClick={() => setLanguage("ro")}>RO</button><button className={language === "en" ? "active" : ""} onClick={() => setLanguage("en")}>EN</button></div></div>
+  return <main className="loginShell"><section className="loginCard" aria-labelledby="login-title">
+    <div className="loginTop"><div className="logo" aria-hidden="true">eC</div><div className="languageSwitch" role="group" aria-label={language === "en" ? "Interface language" : "Limba interfeței"}><button aria-pressed={language === "ro"} className={language === "ro" ? "active" : ""} onClick={() => setLanguage("ro")}>RO</button><button aria-pressed={language === "en"} className={language === "en" ? "active" : ""} onClick={() => setLanguage("en")}>EN</button></div></div>
     <p className="appName">eClinTalk</p>
-    <h1>{forgotPassword ? (language === "en" ? "Reset password" : "Recuperează parola") : signup ? (language === "en" ? "Create account" : "Creează cont") : t("secureSignIn")}</h1>
+    <h1 id="login-title">{forgotPassword ? (language === "en" ? "Reset password" : "Recuperează parola") : signup ? (language === "en" ? "Create account" : "Creează cont") : t("secureSignIn")}</h1>
     <p className="muted">{t("privateHelp")}</p>
     {invitePreview && <div className="inviteBanner"><strong>{language === "en" ? `Invitation to ${invitePreview.community_name}` : `Invitație în ${invitePreview.community_name}`}</strong><span>{language === "en" ? `Continue with ${invitePreview.invitee_email}.` : `Continuă cu adresa ${invitePreview.invitee_email}.`}</span></div>}
     {forgotPassword ? <form id="recovery-form" name="recovery" onSubmit={sendResetLink} className="form" autoComplete="on" method="post">
       <label htmlFor="recovery-email">{t("email")}<input id="recovery-email" name="email" type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
-      {notice && <p className={notice.error ? "error" : "success"}>{notice.text}</p>}
+      {notice && <p role={notice.error ? "alert" : "status"} className={notice.error ? "error" : "success"}>{notice.text}</p>}
       <button disabled={busy} className="primary">{busy ? (language === "en" ? "Sending..." : "Se trimite...") : (language === "en" ? "Send recovery link" : "Trimite linkul de recuperare")}</button>
     </form> : <form id={signup ? "signup-form" : "login-form"} name={signup ? "signup" : "login"} onSubmit={submit} className="form" autoComplete="on" method="post">
       <label htmlFor={signup ? "signup-email" : "login-email"}>{t("email")}<input id={signup ? "signup-email" : "login-email"} name="email" type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="username" enterKeyHint="next" autoFocus required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
       <label htmlFor={signup ? "new-password" : "current-password"}>{t("password")}<span className="passwordField"><input id={signup ? "new-password" : "current-password"} name="password" type={showPassword ? "text" : "password"} autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete={signup ? "new-password" : "current-password"} enterKeyHint="go" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} /><button type="button" className="passwordToggle" aria-label={showPassword ? (language === "en" ? "Hide password" : "Ascunde parola") : (language === "en" ? "Show password" : "Arată parola")} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? "🙈" : "👁️"}</button></span></label>
-      {notice && <p className={notice.error ? "error" : "success"}>{notice.text}</p>}
+      {notice && <p role={notice.error ? "alert" : "status"} className={notice.error ? "error" : "success"}>{notice.text}</p>}
       <button type="submit" disabled={busy} className="primary">{busy ? t("processing") : signup ? (language === "en" ? "Create account" : "Creează cont") : t("enterApp")}</button>
       {!signup && <p className="passwordHelp">{language === "en" ? "Saved credentials are securely filled and managed by your device's password manager." : "Datele salvate sunt completate și administrate în siguranță de managerul de parole al dispozitivului."}</p>}
     </form>}
@@ -204,7 +204,7 @@ function Login({ language, setLanguage, inviteToken }) {
     <button className="linkBtn" onClick={() => { setForgotPassword(false); setSignup(forgotPassword ? false : !signup); setNotice(null); }}>
       {forgotPassword ? (language === "en" ? "Back to sign-in" : "Înapoi la conectare") : signup ? (language === "en" ? "Already have an account? Sign in" : "Ai deja cont? Conectează-te") : t("noAccount")}
     </button>
-    <p className="note">{t("testWarning")}</p><p className="poweredBy">{t("createdBy")}</p>
+    <p className="note safetyNotice" role="note"><span aria-hidden="true">⚠</span>{t("testWarning")}</p><p className="poweredBy">{t("createdBy")}</p>
   </section></main>;
 }
 
@@ -241,7 +241,7 @@ function UpdatePassword({ completed, language }) {
     <form onSubmit={submit} className="form" autoComplete="on">
       <label>{l("Parola nouă", "New password")}<input name="new-password" type="password" autoComplete="new-password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} /></label>
       <label>{l("Confirmă parola", "Confirm password")}<input name="confirm-password" type="password" autoComplete="new-password" required minLength={8} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} /></label>
-      {notice && <p className={notice.error ? "error" : "success"}>{notice.text}</p>}
+      {notice && <p role={notice.error ? "alert" : "status"} className={notice.error ? "error" : "success"}>{notice.text}</p>}
       <button className="primary" disabled={busy || password.length < 8 || confirmPassword.length < 8}>{busy ? l("Se salvează...", "Saving...") : l("Salvează parola nouă", "Save new password")}</button>
     </form>
   </section></main>;
@@ -273,9 +273,9 @@ function NewConversation({ close, created, communities, selectedCommunityId, isG
     setBusy(false);
   }
 
-  return <div className="modalBackdrop" onMouseDown={close}><section className="modal" onMouseDown={(e) => e.stopPropagation()}>
-    <div className="modalTitle"><div><p className="eyebrow">{l("Grup privat", "Private group")}</p><h2>{l("Grup nou", "New group")}</h2></div>
-      <button className="iconBtn" onClick={close}>×</button></div>
+  return <div className="modalBackdrop" onMouseDown={close}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="new-group-title" onMouseDown={(e) => e.stopPropagation()}>
+    <div className="modalTitle"><div><p className="eyebrow">{l("Grup privat", "Private group")}</p><h2 id="new-group-title">{l("Grup nou", "New group")}</h2></div>
+      <button className="iconBtn" onClick={close} aria-label={l("Închide", "Close")}>×</button></div>
     <form className="form" onSubmit={submit}>
       <label>{l("Numele grupului", "Group name")}<input required maxLength={80} value={title} onChange={(e) => setTitle(e.target.value)} /></label>
       <label>{l("Locul grupului", "Group location")}<select value={communityId} onChange={(e) => setCommunityId(e.target.value)}>
@@ -285,7 +285,7 @@ function NewConversation({ close, created, communities, selectedCommunityId, isG
       <label>{l("Emailurile membrilor", "Member emails")}<textarea rows={4} placeholder="user1@example.com, user2@example.com" value={emails} onChange={(e) => setEmails(e.target.value)} /></label>
       <p className="helper">{l("Pentru un grup din comunitate, persoanele trebuie adăugate mai întâi în comunitate.", "For a community group, people must first be added to the community.")}</p>
       <label>{l("Parolă suplimentară opțională", "Optional additional password")}<input type="password" minLength={6} maxLength={64} placeholder={l("Lasă liber dacă nu dorești parolă", "Leave blank if no password is needed")} value={initialPassword} onChange={(e) => setInitialPassword(e.target.value)} /></label>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
       <div className="modalActions"><button type="button" onClick={close}>{l("Renunță", "Cancel")}</button>
         <button className="primary" disabled={busy || !title.trim()}>{busy ? l("Se creează...", "Creating...") : l("Creează", "Create")}</button></div>
     </form>
@@ -306,12 +306,12 @@ function NewCommunity({ close, created, language }) {
     if (createError) setError(createError.message); else created(data);
     setBusy(false);
   }
-  return <div className="modalBackdrop" onMouseDown={close}><section className="modal" onMouseDown={(e) => e.stopPropagation()}>
-    <div className="modalTitle"><div><p className="eyebrow">eClinTalk</p><h2>{l("Comunitate nouă", "New community")}</h2></div><button className="iconBtn" onClick={close}>×</button></div>
+  return <div className="modalBackdrop" onMouseDown={close}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="new-community-title" onMouseDown={(e) => e.stopPropagation()}>
+    <div className="modalTitle"><div><p className="eyebrow">eClinTalk</p><h2 id="new-community-title">{l("Comunitate nouă", "New community")}</h2></div><button className="iconBtn" onClick={close} aria-label={l("Închide", "Close")}>×</button></div>
     <form className="form" onSubmit={submit}>
       <label>{l("Numele comunității", "Community name")}<input required maxLength={80} value={name} onChange={(e) => setName(e.target.value)} /></label>
       <label>{l("Descriere", "Description")}<textarea rows={3} maxLength={500} value={description} onChange={(e) => setDescription(e.target.value)} /></label>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
       <div className="modalActions"><button type="button" onClick={close}>{l("Renunță", "Cancel")}</button><button className="primary" disabled={busy || !name.trim()}>{busy ? l("Se creează...", "Creating...") : l("Creează", "Create")}</button></div>
     </form>
   </section></div>;
@@ -486,6 +486,24 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
       .catch(() => active && setPushEnabled(false));
     return () => { active = false; };
   }, [session.access_token]);
+
+  useEffect(() => {
+    function closeWithEscape(event) {
+      if (event.key !== "Escape" || logoutWarning) return;
+      if (passwordOpen && !passwordBusy) cancelPassword();
+      else if (settingsOpen && !settingsBusy) setSettingsOpen(false);
+      else if (communitySettingsOpen && !communityBusy) setCommunitySettingsOpen(false);
+      else if (profileOpen && !profileBusy) setProfileOpen(false);
+      else if (modal) setModal(false);
+      else if (communityModal) setCommunityModal(false);
+      else if (emojiOpen) setEmojiOpen(false);
+      else if (reactionTarget) setReactionTarget(null);
+      else if (pinnedOpen) setPinnedOpen(false);
+      else if (mobileMenuOpen) setMobileMenuOpen(false);
+    }
+    document.addEventListener("keydown", closeWithEscape);
+    return () => document.removeEventListener("keydown", closeWithEscape);
+  }, [logoutWarning, passwordOpen, passwordBusy, settingsOpen, settingsBusy, communitySettingsOpen, communityBusy, profileOpen, profileBusy, modal, communityModal, emojiOpen, reactionTarget, pinnedOpen, mobileMenuOpen]);
 
   useEffect(() => {
     const previous = previousRoomId.current;
@@ -1172,36 +1190,37 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
   }
 
   return <main className="app">
-    <aside id="group-menu" className={`side ${mobileMenuOpen ? "open" : ""}`}>
+    <a className="skipLink" href="#conversation-content">{l("Sari la conversație", "Skip to conversation")}</a>
+    <aside id="group-menu" aria-label={l("Comunități și conversații", "Communities and conversations")} className={`side ${mobileMenuOpen ? "open" : ""}`}>
       <div className="brandRow"><div><p className="eyebrow">eClinTalk</p><h2>{t("myConversations")}</h2></div><div className="brandActions"><button className="mobileCloseBtn" onClick={() => setMobileMenuOpen(false)} aria-label={l("Închide meniul", "Close menu")}>×</button></div></div>
       <div className="communityNav">
-        <button className={selectedCommunityId === "all" ? "selected" : ""} onClick={() => chooseCommunity("all")}>▦ {t("allConversations")}</button>
+        <button aria-pressed={selectedCommunityId === "all"} className={selectedCommunityId === "all" ? "selected" : ""} onClick={() => chooseCommunity("all")}>▦ {t("allConversations")}</button>
         <div className="communityNavTitle"><strong>{t("communities")}</strong>{isGeneralAdmin && <button title={l("Creează o comunitate", "Create a community")} aria-label={l("Creează o comunitate", "Create a community")} onClick={() => setCommunityModal(true)}>＋</button>}</div>
         {communities.length === 0 && <p className="communityEmpty">{l("Nu faci parte încă dintr-o comunitate.", "You are not part of a community yet.")}</p>}
-        {communities.map((item) => <button key={item.id} className={selectedCommunityId === item.id ? "selected" : ""} onClick={() => chooseCommunity(item.id)}>
+        {communities.map((item) => <button key={item.id} aria-pressed={selectedCommunityId === item.id} className={selectedCommunityId === item.id ? "selected" : ""} onClick={() => chooseCommunity(item.id)}>
           <span>◉</span><div><strong>{item.name}</strong><small>{item.group_count} {l("grupuri", "groups")} · {item.member_count} {t("members")}</small></div>
         </button>)}
-        {rooms.some((item) => !item.community_id) && <button className={selectedCommunityId === "private" ? "selected" : ""} onClick={() => chooseCommunity("private")}>◇ {t("otherGroups")}</button>}
+        {rooms.some((item) => !item.community_id) && <button aria-pressed={selectedCommunityId === "private"} className={selectedCommunityId === "private" ? "selected" : ""} onClick={() => chooseCommunity("private")}>◇ {t("otherGroups")}</button>}
       </div>
       {selectedCommunity?.my_is_admin && <button className="manageCommunityBtn" onClick={openCommunitySettings}><Icon name="users" size={16}/>{l("Membri și setări", "Members and settings")}</button>}
       {canCreateGroup && <button className="primary newBtn" onClick={() => setModal(true)}>{selectedCommunity ? l(`+ Grup nou în ${selectedCommunity.name}`, `+ New group in ${selectedCommunity.name}`) : t("newGroup")}</button>}
       <label className="roomSearch"><Icon name="search" size={16}/><input value={roomSearch} onChange={(event) => setRoomSearch(event.target.value)} placeholder={l("Caută grupuri", "Search groups")} aria-label={l("Caută grupuri", "Search groups")} /></label>
-      <div className="conversationList">
+      <nav className="conversationList" aria-label={l("Lista conversațiilor", "Conversation list")}>
         {loading && <p className="status">{t("loading")}</p>}
         {!loading && filteredVisibleRooms.length === 0 && <p className="emptySide">{roomSearch ? l("Niciun grup nu corespunde căutării.", "No groups match your search.") : l("Nu ai conversații în această secțiune.", "You have no conversations in this section.")}</p>}
-        {filteredVisibleRooms.map((item) => <button className={`conv ${item.id === roomId ? "active" : ""}`} key={item.id} onClick={() => chooseRoom(item.id)}>
+        {filteredVisibleRooms.map((item) => <button aria-current={item.id === roomId ? "page" : undefined} className={`conv ${item.id === roomId ? "active" : ""}`} key={item.id} onClick={() => chooseRoom(item.id)}>
           <span>{item.title.slice(0, 2).toUpperCase()}</span><div><strong>{item.is_pinned && <Icon name="pin" size={12}/>} {item.title}</strong><small>{item.member_count} {t("members")} · {item.community_name || t("groupWithoutCommunity")}</small></div>
           {!item.password_protected && item.unread_count > 0 && <i className="unreadBadge">{item.unread_count > 99 ? "99+" : item.unread_count}</i>}
         </button>)}
-      </div>
+      </nav>
       <div className="sideFooter"><button className="profileBtn" onClick={openProfile}><strong>{profileName || session.user.email}</strong><small>{t("profile")} · {isGeneralAdmin ? t("generalAdmin") : t("connected")}</small></button><button className="logoutBtn" onClick={signOut} title={t("logout")}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10" /></svg><span>{t("logout")}</span></button><p className="poweredBy sideCredit">{t("createdBy")}</p></div>
     </aside>
     {mobileMenuOpen && <button className="sideBackdrop" onClick={() => setMobileMenuOpen(false)} aria-label={l("Închide meniul", "Close menu")} />}
-    {inviteStatus && <div className="inviteToast"><span>{inviteStatus}</span><button onClick={() => setInviteStatus("")} aria-label={l("Închide", "Close")}>×</button></div>}
-    <section className={`chat ${room ? "" : "chatEmpty"}`}>
+    {inviteStatus && <div className="inviteToast" role="status"><span>{inviteStatus}</span><button onClick={() => setInviteStatus("")} aria-label={l("Închide", "Close")}>×</button></div>}
+    <section id="conversation-content" tabIndex="-1" aria-label={room ? l(`Conversația ${room.title}`, `${room.title} conversation`) : t("yourConversations")} className={`chat ${room ? "" : "chatEmpty"}`}>
       {room ? <><header><button className="mobileMenuBtn iconTextBtn" onClick={() => setMobileMenuOpen(true)} aria-controls="group-menu" aria-expanded={mobileMenuOpen}><Icon name="menu"/><span className="srOnly">{l("Meniu", "Menu")}</span></button><div className="headerMain"><strong>{room.title}</strong><small>{room.member_count} {t("members")} · {room.community_name || t("groupWithoutCommunity")} · {l("numai membrii au acces", "members only")}</small></div><div className="headerActions"><b>● {l("Privat", "Private")}</b><button className="iconTextBtn" onClick={toggleGroupPin}><Icon name="pin" size={16}/>{room.is_pinned ? l("Fixat", "Pinned") : "Pin"}</button><button className="iconTextBtn" onClick={openSettings}><Icon name="settings" size={16}/>{l("Setări", "Settings")}</button></div></header>
-        <div className="warning">{t("testWarning")}</div>
-        <div className="msgs">
+        <div className="warning" role="note"><span aria-hidden="true">⚠</span>{t("testWarning")}</div>
+        <div className="msgs" role="log" aria-live="polite" aria-relevant="additions text" aria-label={l("Mesaje", "Messages")}>
           {pinnedMessages.length > 0 && <div className="pinnedArea">
             <button className="pinnedBanner" onClick={() => pinnedMessages.length === 1 ? scrollToMessage(pinnedMessages[0].id) : setPinnedOpen(!pinnedOpen)}>
               <Icon name="pin" size={17}/><span>{pinnedMessages.length} {pinnedMessages.length === 1 ? l("mesaj fixat", "pinned message") : l("mesaje fixate", "pinned messages")}</span><span className="pinChevron">{pinnedMessages.length > 1 ? (pinnedOpen ? "▲" : "▼") : "›"}</span>
@@ -1214,8 +1233,8 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
           </div>}
           {messages.length === 0 && !error && <p className="status">{l("Trimite primul mesaj.", "Send the first message.")}</p>}
           {messages.map((item,index) => { const mine = item.user_id === session.user.id; const replied = messages.find((x) => x.id === item.reply_to_id); const itemReactions = groupedReactions(item.id); const showDay = index===0 || new Date(messages[index-1].created_at).toDateString()!==new Date(item.created_at).toDateString(); return <Fragment key={item.id}>
-            {showDay && <div className="dayDivider"><span>{dayLabel(item.created_at,language)}</span></div>}
-            {item.id===unreadBoundaryId && <div className="unreadDivider"><span>{l("Mesaje noi", "New messages")}</span></div>}
+            {showDay && <div className="dayDivider" role="separator"><span>{dayLabel(item.created_at,language)}</span></div>}
+            {item.id===unreadBoundaryId && <div className="unreadDivider" role="separator"><span>{l("Mesaje noi", "New messages")}</span></div>}
             <div ref={(node) => { messageRefs.current[item.id] = node; }} className={`messageWrap ${mine ? "mine" : ""}`}>
             <div className={`bubble ${mine ? "mine" : ""} ${item.attachment_path ? "hasImage" : ""} ${item.pinned_at ? "pinnedMessage" : ""} ${item.deleted_at ? "deletedMessage" : ""}`}>
               {item.deleted_at ? <p className="deletedText">{l("Mesaj șters", "Deleted message")}</p> : <>
@@ -1233,31 +1252,31 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
             {!item.deleted_at && <div className="messageActions"><button onClick={() => setReplyTo(item)}><Icon name="reply" size={15}/>{l("Răspunde", "Reply")}</button><button onClick={() => setReactionTarget(reactionTarget === item.id ? null : item.id)}><Icon name="smile" size={15}/>{l("Reacție", "React")}</button>
               {room.my_is_admin && <button onClick={() => toggleMessagePin(item.id)}><Icon name="pin" size={15}/>{item.pinned_at ? l("Anulează pin", "Unpin") : "Pin"}</button>}
               {(mine || room.my_is_admin) && <button className="deleteMessageBtn" disabled={deletingMessageId === item.id} onClick={() => deleteMessage(item)}><Icon name="trash" size={15}/>{deletingMessageId === item.id ? l("Se șterge...", "Deleting...") : l("Șterge", "Delete")}</button>}</div>}
-            {!item.deleted_at && reactionTarget === item.id && <div className="reactionPicker">{REACTION_EMOJIS.map((emoji) => <button key={emoji} onClick={() => reactToMessage(item.id, emoji)}>{emoji}</button>)}</div>}
-            {!item.deleted_at && Object.keys(itemReactions).length > 0 && <div className="reactionSummary">{Object.entries(itemReactions).map(([emoji, info]) => <button className={info.mine ? "mine" : ""} key={emoji} onClick={() => reactToMessage(item.id, emoji)}>{emoji} {info.count}</button>)}</div>}
+            {!item.deleted_at && reactionTarget === item.id && <div className="reactionPicker" role="group" aria-label={l("Alege reacția", "Choose reaction")}>{REACTION_EMOJIS.map((emoji) => <button aria-label={l(`Reacție ${emoji}`, `React ${emoji}`)} key={emoji} onClick={() => reactToMessage(item.id, emoji)}>{emoji}</button>)}</div>}
+            {!item.deleted_at && Object.keys(itemReactions).length > 0 && <div className="reactionSummary">{Object.entries(itemReactions).map(([emoji, info]) => <button aria-label={l(`${info.count} reacții ${emoji}`, `${info.count} ${emoji} reactions`)} className={info.mine ? "mine" : ""} key={emoji} onClick={() => reactToMessage(item.id, emoji)}>{emoji} {info.count}</button>)}</div>}
           </div></Fragment>; })}<div ref={bottom} />
         </div>
-        <div>{error && <p className="chatError">{error}</p>}<form className="composer" onSubmit={send}>
-	          {replyTo && <div className="selectedReply"><div><strong>{l("Răspuns către", "Reply to")} {displayNameForUser(replyTo.user_id, replyTo.sender_email)}</strong><span>{replyTo.body || (replyTo.attachment_path ? l("📷 Imagine", "📷 Image") : l("Mesaj", "Message"))}</span></div>{replyTo.attachment_path && imageUrls[replyTo.attachment_path] && <img src={imageUrls[replyTo.attachment_path]} alt={l("Imagine selectată pentru răspuns", "Image selected for reply")} />}<button type="button" onClick={() => setReplyTo(null)}>×</button></div>}
+        <div>{error && <p className="chatError" role="alert">{error}</p>}<form className="composer" onSubmit={send} aria-label={l("Scrie un mesaj", "Write a message")}>
+	          {replyTo && <div className="selectedReply"><div><strong>{l("Răspuns către", "Reply to")} {displayNameForUser(replyTo.user_id, replyTo.sender_email)}</strong><span>{replyTo.body || (replyTo.attachment_path ? l("📷 Imagine", "📷 Image") : l("Mesaj", "Message"))}</span></div>{replyTo.attachment_path && imageUrls[replyTo.attachment_path] && <img src={imageUrls[replyTo.attachment_path]} alt={l("Imagine selectată pentru răspuns", "Image selected for reply")} />}<button type="button" onClick={() => setReplyTo(null)} aria-label={l("Anulează răspunsul", "Cancel reply")}>×</button></div>}
           <input ref={fileInput} className="fileInput" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" onChange={chooseFile} />
           <button className="attachBtn" type="button" onClick={() => fileInput.current?.click()} disabled={sending} title={l("Atașează imagine", "Attach image")} aria-label={l("Atașează imagine", "Attach image")}><Icon name="attachment" size={20}/></button>
           <button className={`emojiBtn ${emojiOpen ? "active" : ""}`} type="button" onClick={() => setEmojiOpen(!emojiOpen)} disabled={sending} title={l("Emoticoane", "Emoji")} aria-label={l("Emoticoane", "Emoji")}><Icon name="smile" size={20}/></button>
-	          <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={t("messagePlaceholder")} maxLength={4000} disabled={sending} autoComplete="off" />
+	          <input aria-label={l("Mesaj", "Message")} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={t("messagePlaceholder")} maxLength={4000} disabled={sending} autoComplete="off" />
 	          <button className="primary sendBtn iconTextBtn" disabled={sending || (!draft.trim() && !attachment)}><Icon name="send" size={17}/><span>{sending ? t("sending") : t("send")}</span></button>
 	          {mentionMatch && <div className="mentionPicker" role="listbox" aria-label={t("mentionHint")}>
 	            {mentionSuggestions.length ? mentionSuggestions.map((member) => <button type="button" key={member.user_id} onClick={() => insertMention(member)}><span className="mentionAvatar">{(member.display_name || member.email).slice(0, 2).toUpperCase()}</span><span><strong>{member.display_name || member.email.split("@")[0]}</strong><small>{member.email}</small></span></button>) : <p>{language === "en" ? "No matching member" : "Niciun membru găsit"}</p>}
 	          </div>}
-          {emojiOpen && <div className="emojiPicker"><div className="emojiTabs">{emojiTabs.map((category) => <button className={emojiCategory===category.id ? "active" : ""} type="button" key={category.id} onClick={() => setEmojiCategory(category.id)} title={l(category.ro,category.en)}>{category.icon}<span>{l(category.ro,category.en)}</span></button>)}</div><div className="emojiGrid">{activeEmojiItems.map((emoji) => <button type="button" key={emoji} onClick={() => insertEmoji(emoji)}>{emoji}</button>)}</div></div>}
-          {attachment && <div className="selectedFile"><span>{attachment.name}</span><button type="button" onClick={() => { setAttachment(null); if (fileInput.current) fileInput.current.value = ""; }}>×</button></div>}
+          {emojiOpen && <div className="emojiPicker" role="dialog" aria-label={l("Selector de emoticoane", "Emoji picker")}><div className="emojiTabs" role="tablist">{emojiTabs.map((category) => <button role="tab" aria-selected={emojiCategory===category.id} className={emojiCategory===category.id ? "active" : ""} type="button" key={category.id} onClick={() => setEmojiCategory(category.id)} title={l(category.ro,category.en)}>{category.icon}<span>{l(category.ro,category.en)}</span></button>)}</div><div className="emojiGrid">{activeEmojiItems.map((emoji) => <button aria-label={l(`Adaugă ${emoji}`, `Add ${emoji}`)} type="button" key={emoji} onClick={() => insertEmoji(emoji)}>{emoji}</button>)}</div></div>}
+          {attachment && <div className="selectedFile"><span>{attachment.name}</span><button type="button" aria-label={l("Elimină atașamentul", "Remove attachment")} onClick={() => { setAttachment(null); if (fileInput.current) fileInput.current.value = ""; }}>×</button></div>}
         </form></div></> :
 	        <><div className="mobileWelcomeBar"><button className="mobileMenuBtn iconTextBtn" onClick={() => setMobileMenuOpen(true)} aria-controls="group-menu" aria-expanded={mobileMenuOpen}><Icon name="menu"/><span>{t("myConversations")}</span></button></div><div className="welcome conversationHome"><div className="logo">eC</div><h2>{selectedCommunity?.name || t("yourConversations")}</h2><p>{visibleRooms.length ? t("chooseConversation") : t("noConversations")}</p>
 	          {visibleRooms.length > 0 && <div className="homeConversationList">{visibleRooms.map((item) => <button key={item.id} onClick={() => chooseRoom(item.id)}><span>{item.title.slice(0,2).toUpperCase()}</span><div><strong>{item.is_pinned && <Icon name="pin" size={12}/>} {item.title}</strong><small>{item.member_count} {t("members")} · {item.community_name || t("groupWithoutCommunity")}</small></div>{!item.password_protected && item.unread_count > 0 && <i className="unreadBadge">{item.unread_count > 99 ? "99+" : item.unread_count}</i>}</button>)}</div>}
-	          {!visibleRooms.length && canCreateGroup && <button className="primary" onClick={() => setModal(true)}>{t("firstGroup")}</button>}{error && <p className="chatError">{error}</p>}</div></>}
+	          {!visibleRooms.length && canCreateGroup && <button className="primary" onClick={() => setModal(true)}>{t("firstGroup")}</button>}{error && <p className="chatError" role="alert">{error}</p>}</div></>}
     </section>
     {modal && <NewConversation language={language} close={() => setModal(false)} communities={communities} selectedCommunityId={selectedCommunityId} isGeneralAdmin={isGeneralAdmin} created={(id) => { setModal(false); loadRooms(id); loadCommunities(); }} />}
     {communityModal && <NewCommunity language={language} close={() => setCommunityModal(false)} created={(id) => { setCommunityModal(false); loadCommunities(id); }} />}
-    {settingsOpen && room && <div className="modalBackdrop" onMouseDown={() => !settingsBusy && setSettingsOpen(false)}><section className="modal manageModal" onMouseDown={(e) => e.stopPropagation()}>
-      <div className="modalTitle"><div><p className="eyebrow">{l("Grup privat", "Private group")}</p><h2>{l("Setări", "Settings")}</h2></div><button className="iconBtn" disabled={settingsBusy} onClick={() => setSettingsOpen(false)}>×</button></div>
+    {settingsOpen && room && <div className="modalBackdrop" onMouseDown={() => !settingsBusy && setSettingsOpen(false)}><section className="modal manageModal" role="dialog" aria-modal="true" aria-labelledby="group-settings-title" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="modalTitle"><div><p className="eyebrow">{l("Grup privat", "Private group")}</p><h2 id="group-settings-title">{l("Setări", "Settings")}</h2></div><button className="iconBtn" aria-label={l("Închide", "Close")} disabled={settingsBusy} onClick={() => setSettingsOpen(false)}>×</button></div>
       {isAdmin && <form className="manageSection" onSubmit={renameConversation}>
         <label>{l("Numele grupului", "Group name")}<div className="inlineForm"><input required maxLength={80} value={settingsTitle} onChange={(e) => setSettingsTitle(e.target.value)} /><button className="primary" disabled={settingsBusy || !settingsTitle.trim()}>{t("save")}</button></div></label>
       </form>}
@@ -1300,11 +1319,11 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
         <div className="passwordActions"><button className="primary" disabled={settingsBusy || groupPassword.length < 6}>{passwordProtected ? l("Schimbă parola", "Change password") : l("Activează parola", "Enable password")}</button>
           {passwordProtected && <button type="button" disabled={settingsBusy} onClick={removeGroupPassword}>{l("Elimină parola", "Remove password")}</button>}</div>
       </form>}
-      {settingsError && <p className="error manageError">{settingsError}</p>}
+      {settingsError && <p className="error manageError" role="alert">{settingsError}</p>}
       <div className="dangerZone">{isOwner ? <button className="dangerBtn" disabled={settingsBusy} onClick={deleteConversation}>{l("Șterge conversația", "Delete conversation")}</button> : <button className="dangerBtn" disabled={settingsBusy} onClick={leaveConversation}>{l("Părăsește conversația", "Leave conversation")}</button>}</div>
     </section></div>}
-    {communitySettingsOpen && selectedCommunity && <div className="modalBackdrop" onMouseDown={() => !communityBusy && setCommunitySettingsOpen(false)}><section className="modal manageModal" onMouseDown={(e) => e.stopPropagation()}>
-      <div className="modalTitle"><div><p className="eyebrow">{selectedCommunity.name}</p><h2>{l("Administrează comunitatea", "Manage community")}</h2></div><button className="iconBtn" disabled={communityBusy} onClick={() => setCommunitySettingsOpen(false)} aria-label={l("Închide", "Close")}>×</button></div>
+    {communitySettingsOpen && selectedCommunity && <div className="modalBackdrop" onMouseDown={() => !communityBusy && setCommunitySettingsOpen(false)}><section className="modal manageModal" role="dialog" aria-modal="true" aria-labelledby="community-settings-title" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="modalTitle"><div><p className="eyebrow">{selectedCommunity.name}</p><h2 id="community-settings-title">{l("Administrează comunitatea", "Manage community")}</h2></div><button className="iconBtn" disabled={communityBusy} onClick={() => setCommunitySettingsOpen(false)} aria-label={l("Închide", "Close")}>×</button></div>
       <p className="communityIntro">{l("Adaugă direct conturile existente sau creează un link pentru persoanele care nu au încă un cont. Poți alege și grupurile în care vor intra.", "Add existing accounts directly or create a link for people who do not have an account yet. You can also choose which groups they will join.")}</p>
       <form className="manageSection" onSubmit={saveCommunity}>
         <label>{l("Numele comunității", "Community name")}<input required maxLength={80} value={communityName} onChange={(e) => setCommunityName(e.target.value)} /></label>
@@ -1329,30 +1348,30 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
           {member.user_id !== session.user.id && (!member.is_admin || isGeneralAdmin) && <button disabled={communityBusy} onClick={() => removeCommunityMember(member)}>{l("Elimină", "Remove")}</button>}</div>
         </div>)}</div>
       </div>
-      {communityNotice && <p className="success communityNotice">{communityNotice}</p>}
-      {communityError && <p className="error manageError">{communityError}</p>}
+      {communityNotice && <p className="success communityNotice" role="status">{communityNotice}</p>}
+      {communityError && <p className="error manageError" role="alert">{communityError}</p>}
       {isGeneralAdmin && <div className="dangerZone"><button className="dangerBtn" disabled={communityBusy} onClick={deleteCommunity}>{l("Șterge comunitatea", "Delete community")}</button></div>}
     </section></div>}
-    {profileOpen && <div className="modalBackdrop" onMouseDown={() => !profileBusy && setProfileOpen(false)}><section className="modal profileModal" onMouseDown={(e) => e.stopPropagation()}>
-      <div className="modalTitle"><div><p className="eyebrow">eClinTalk</p><h2>{t("accountSettings")}</h2></div><button className="iconBtn" disabled={profileBusy} onClick={() => setProfileOpen(false)}>×</button></div>
+    {profileOpen && <div className="modalBackdrop" onMouseDown={() => !profileBusy && setProfileOpen(false)}><section className="modal profileModal" role="dialog" aria-modal="true" aria-labelledby="profile-settings-title" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="modalTitle"><div><p className="eyebrow">eClinTalk</p><h2 id="profile-settings-title">{t("accountSettings")}</h2></div><button className="iconBtn" aria-label={l("Închide", "Close")} disabled={profileBusy} onClick={() => setProfileOpen(false)}>×</button></div>
       <form className="form" onSubmit={saveProfile}>
         <label>{t("displayName")}<input required minLength={2} maxLength={80} value={profileName} onChange={(e) => setProfileName(e.target.value)} /></label>
         <label>{t("email")}<input value={session.user.email || ""} disabled /></label>
         <label>{t("language")}<select value={language} onChange={(e) => setLanguage(e.target.value)}><option value="ro">Română</option><option value="en">English</option></select></label>
-        {profileError && <p className="error">{profileError}</p>}
+        {profileError && <p className="error" role="alert">{profileError}</p>}
         <div className="modalActions"><button type="button" disabled={profileBusy} onClick={() => setProfileOpen(false)}>{t("cancel")}</button><button className="primary" disabled={profileBusy || profileName.trim().length < 2}>{profileBusy ? t("processing") : t("save")}</button></div>
       </form>
     </section></div>}
-    {passwordOpen && room && <div className="modalBackdrop"><section className="modal passwordModal">
-      <div className="lockMark">🔒</div><p className="eyebrow">{l("Grup protejat", "Protected group")}</p><h2>{room.title}</h2>
+    {passwordOpen && room && <div className="modalBackdrop"><section className="modal passwordModal" role="dialog" aria-modal="true" aria-labelledby="password-dialog-title">
+      <div className="lockMark" aria-hidden="true">🔒</div><p className="eyebrow">{l("Grup protejat", "Protected group")}</p><h2 id="password-dialog-title">{room.title}</h2>
       <p className="muted">{l("Introdu parola suplimentară pentru a deschide conversația.", "Enter the additional password to open this conversation.")}</p>
       <form className="form" onSubmit={unlockConversation}><label>{l("Parola grupului", "Group password")}<input autoFocus type="password" value={roomPassword} onChange={(e) => setRoomPassword(e.target.value)} /></label>
-        {passwordError && <p className="error">{passwordError}</p>}
+        {passwordError && <p className="error" role="alert">{passwordError}</p>}
         <div className="modalActions"><button type="button" disabled={passwordBusy} onClick={cancelPassword}>{t("cancel")}</button><button className="primary" disabled={passwordBusy || !roomPassword}>{passwordBusy ? l("Se verifică...", "Checking...") : l("Deschide grupul", "Open group")}</button></div>
       </form>
     </section></div>}
-    {logoutWarning && <div className="modalBackdrop"><section className="modal timeoutModal">
-      <p className="eyebrow">{l("Sesiune inactivă", "Inactive session")}</p><h2>{l(`Vei fi delogat în ${logoutCountdown} secunde`, `You will be signed out in ${logoutCountdown} seconds`)}</h2>
+    {logoutWarning && <div className="modalBackdrop"><section className="modal timeoutModal" role="alertdialog" aria-modal="true" aria-labelledby="timeout-dialog-title">
+      <p className="eyebrow">{l("Sesiune inactivă", "Inactive session")}</p><h2 id="timeout-dialog-title" aria-live="polite">{l(`Vei fi delogat în ${logoutCountdown} secunde`, `You will be signed out in ${logoutCountdown} seconds`)}</h2>
       <p className="muted">{l("Pentru protejarea contului, sesiunea se închide automat după 15 minute fără activitate.", "To protect your account, the session closes automatically after 15 minutes of inactivity.")}</p>
       <div className="modalActions"><button onClick={signOut}>{l("Ieșire acum", "Sign out now")}</button><button className="primary" onClick={() => window.dispatchEvent(new Event("pointerdown"))}>{l("Rămân conectat", "Stay signed in")}</button></div>
     </section></div>}
