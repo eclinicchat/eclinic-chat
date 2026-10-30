@@ -317,7 +317,7 @@ function NewCommunity({ close, created, language }) {
   </section></div>;
 }
 
-function Chat({ session, language, setLanguage, inviteToken, invitationCompleted }) {
+function Chat({ session, language, setLanguage, themePreference, setThemePreference, inviteToken, invitationCompleted }) {
   const t = translator(language);
   const l = (ro, en) => localize(language, ro, en);
   const [rooms, setRooms] = useState([]);
@@ -1289,7 +1289,7 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
         <div className="memberActions notificationActions">
           <button type="button" onClick={() => setMutedUntil(new Date(Date.now() + 60 * 60 * 1000).toISOString())}>{l("Silențios 1 oră", "Mute for 1 hour")}</button>
           <button type="button" onClick={() => setMutedUntil(new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString())}>{l("Silențios 8 ore", "Mute for 8 hours")}</button>
-	          <button type="button" onClick={() => setMutedUntil("")}>{t("resumeNotifications")}</button>
+	          <button type="button" disabled={!mutedUntil || new Date(mutedUntil) <= new Date()} onClick={() => setMutedUntil("")}>{t("resumeNotifications")}</button>
         </div>
         <p className="helper">
           {mutedUntil && new Date(mutedUntil) > new Date()
@@ -1358,6 +1358,12 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
         <label>{t("displayName")}<input required minLength={2} maxLength={80} value={profileName} onChange={(e) => setProfileName(e.target.value)} /></label>
         <label>{t("email")}<input value={session.user.email || ""} disabled /></label>
         <label>{t("language")}<select value={language} onChange={(e) => setLanguage(e.target.value)}><option value="ro">Română</option><option value="en">English</option></select></label>
+        <label>{l("Tema interfeței", "Interface theme")}<select value={themePreference} onChange={(e) => setThemePreference(e.target.value)}>
+          <option value="auto">{l("Automat — urmează dispozitivul", "Automatic — follow device")}</option>
+          <option value="light">{l("Luminoasă", "Light")}</option>
+          <option value="dark">{l("Întunecată", "Dark")}</option>
+        </select></label>
+        <p className="helper">{l("Tema aleasă rămâne salvată pe acest dispozitiv și după delogare.", "Your theme choice remains saved on this device after sign-out.")}</p>
         {profileError && <p className="error" role="alert">{profileError}</p>}
         <div className="modalActions"><button type="button" disabled={profileBusy} onClick={() => setProfileOpen(false)}>{t("cancel")}</button><button className="primary" disabled={profileBusy || profileName.trim().length < 2}>{profileBusy ? t("processing") : t("save")}</button></div>
       </form>
@@ -1384,15 +1390,31 @@ export default function Home() {
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [inviteToken, setInviteToken] = useState("");
   const [language, setLanguageState] = useState("ro");
+  const [themePreference, setThemePreferenceState] = useState("auto");
   function setLanguage(nextLanguage) {
     const safeLanguage = nextLanguage === "en" ? "en" : "ro";
     setLanguageState(safeLanguage);
     if (typeof window !== "undefined") window.localStorage.setItem("eclintalk-language", safeLanguage);
     if (typeof document !== "undefined") document.documentElement.lang = safeLanguage;
   }
+  function setThemePreference(nextTheme) {
+    const safeTheme = ["auto", "light", "dark"].includes(nextTheme) ? nextTheme : "auto";
+    setThemePreferenceState(safeTheme);
+    if (typeof window !== "undefined") window.localStorage.setItem("eclintalk-theme", safeTheme);
+    if (typeof document !== "undefined") {
+      const resolvedTheme = safeTheme === "auto"
+        ? (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark")
+        : safeTheme;
+      document.documentElement.dataset.theme = resolvedTheme;
+      document.documentElement.style.colorScheme = resolvedTheme;
+      const themeMeta = document.querySelector('meta[name="theme-color"]');
+      if (themeMeta) themeMeta.setAttribute("content", resolvedTheme === "light" ? "#edf3f8" : "#07111d");
+    }
+  }
   useEffect(() => {
     const storedLanguage = window.localStorage.getItem("eclintalk-language");
     setLanguage(storedLanguage || (navigator.language?.toLowerCase().startsWith("en") ? "en" : "ro"));
+    setThemePreference(window.localStorage.getItem("eclintalk-theme") || "auto");
     const query = new URLSearchParams(window.location.search);
     setInviteToken(query.get("invite") || "");
     if (query.get("recovery") === "1") {
@@ -1406,12 +1428,26 @@ export default function Home() {
     });
     return () => data.subscription.unsubscribe();
   }, []);
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: light)");
+    const syncAutomaticTheme = () => {
+      if (themePreference !== "auto") return;
+      const resolvedTheme = media.matches ? "light" : "dark";
+      document.documentElement.dataset.theme = resolvedTheme;
+      document.documentElement.style.colorScheme = resolvedTheme;
+      const themeMeta = document.querySelector('meta[name="theme-color"]');
+      if (themeMeta) themeMeta.setAttribute("content", resolvedTheme === "light" ? "#edf3f8" : "#07111d");
+    };
+    syncAutomaticTheme();
+    media.addEventListener?.("change", syncAutomaticTheme);
+    return () => media.removeEventListener?.("change", syncAutomaticTheme);
+  }, [themePreference]);
   if (checking) return <main className="center">{language === "en" ? "Checking session..." : "Se verifică sesiunea..."}</main>;
   if (passwordRecovery && session) return <UpdatePassword language={language} completed={() => {
     window.history.replaceState({}, "", "/");
     setPasswordRecovery(false);
   }} />;
-  return session ? <Chat session={session} language={language} setLanguage={setLanguage} inviteToken={inviteToken} invitationCompleted={() => {
+  return session ? <Chat session={session} language={language} setLanguage={setLanguage} themePreference={themePreference} setThemePreference={setThemePreference} inviteToken={inviteToken} invitationCompleted={() => {
     window.history.replaceState({}, "", "/");
     setInviteToken("");
   }} /> : <Login language={language} setLanguage={setLanguage} inviteToken={inviteToken} />;

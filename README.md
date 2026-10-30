@@ -1,6 +1,6 @@
-# eClinTalk v1.14.0
+# eClinTalk v1.14.1
 
-Versiunea v1.14.0 adauga un prim nivel de accesibilitate si safety: contrast imbunatatit conform tintelor WCAG 2.2 AA, focus vizibil pentru navigarea cu tastatura, tinte tactile mai mari pe mobil, etichete pentru cititoarele de ecran, stari accesibile pentru erori si confirmari, inchiderea ferestrelor cu Escape si respectarea preferintei de reducere a animatiilor. Avertismentul privind interdictia introducerii datelor medicale sau personale reale ramane vizibil si este evidentiat mai clar.
+Versiunea v1.14.1 adauga temele Automata, Luminoasa si Intunecata, urmareste setarea dispozitivului in modul Automat si memoreaza alegerea local inclusiv dupa delogare. Tema luminoasa foloseste nuante profesionale gri-albastrui si contrast adaptat. Este corectat si butonul Reia notificarile, care ramane dezactivat atunci cand grupul nu este suspendat temporar. Pastreaza imbunatatirile de accesibilitate si safety din v1.14.0.
 
 Aceasta versiune ramane destinata testarii si comunicarii fara date reale de pacient. Actualizarea nu reprezinta certificare GDPR si nu necesita niciun script SQL nou.
 

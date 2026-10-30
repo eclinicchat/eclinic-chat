@@ -28,8 +28,10 @@ export const viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: "#07111d",
 };
 
 export default function RootLayout({ children }) {
-  return <html lang="ro"><body>{children}</body></html>;
+  const themeScript = `(function(){try{var p=localStorage.getItem('eclintalk-theme')||'auto';var t=p==='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):p;document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t;var m=document.querySelector('meta[name="theme-color"]');if(m)m.content=t==='light'?'#edf3f8':'#07111d'}catch(e){}})()`;
+  return <html lang="ro" suppressHydrationWarning><head><script dangerouslySetInnerHTML={{ __html: themeScript }} /></head><body>{children}</body></html>;
 }
