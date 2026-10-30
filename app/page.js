@@ -948,7 +948,7 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.ready
         .then((registration) => registration.pushManager.getSubscription())
-        .then((subscription) => setPushEnabled(Boolean(subscription)))
+        .then((subscription) => setPushEnabled(Boolean(subscription) && (typeof Notification === "undefined" || Notification.permission === "granted")))
         .catch(() => setPushEnabled(false));
     }
     setSettingsTitle(room?.title || "");
@@ -1264,6 +1264,7 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
       <form className="manageSection" onSubmit={saveNotificationPreferences}>
         <div className="sectionHeading"><strong>{l("Notificări", "Notifications")}</strong><small>{l("Numai pentru contul tău", "Only for your account")}</small></div>
         <label className="checkLabel"><input type="checkbox" checked={notificationsEnabled} onChange={(e) => setNotificationsEnabled(e.target.checked)} />{l("Primește notificări pentru acest grup", "Receive notifications for this group")}</label>
+        {notificationsEnabled && !pushEnabled && <p className="pushWarning" role="status"><span aria-hidden="true">⚠</span>{l("Notificările sunt oprite pe acest dispozitiv.", "Notifications are off on this device.")}</p>}
         <label className="checkLabel"><input type="checkbox" checked={soundEnabled} disabled={!notificationsEnabled} onChange={(e) => setSoundEnabled(e.target.checked)} />{l("Sunet pentru mesajele noi", "Sound for new messages")}</label>
         <label className="checkLabel"><input type="checkbox" checked={mentionsOnly} disabled={!notificationsEnabled} onChange={(e) => setMentionsOnly(e.target.checked)} />{l("Notifică-mă numai când sunt menționat", "Notify me only when mentioned")}</label>
         <div className="memberActions notificationActions">
@@ -1277,7 +1278,7 @@ function Chat({ session, language, setLanguage, inviteToken, invitationCompleted
             : l("Notificările nu sunt suspendate temporar.", "Notifications are not temporarily muted.")}
         </p>
         <button type="button" onClick={togglePushNotifications} disabled={notificationBusy}>
-          {pushEnabled ? l("✓ Notificări active — apasă pentru dezactivare", "✓ Notifications active — tap to disable") : l("Activează notificările pe acest dispozitiv", "Enable notifications on this device")}
+          {pushEnabled ? l("✓ Notificări active — apasă pentru dezactivare", "✓ Notifications active — tap to disable") : l("Activează pe acest dispozitiv", "Enable on this device")}
         </button>
         <p className="helper">{l("Setarea rămâne activă după delogare. Sunetul și vibrația urmează modul dispozitivului. Pe iPhone, activează notificările din aplicația deschisă prin pictograma de pe ecranul principal.", "This setting remains active after sign-out. Sound and vibration follow the device mode. On iPhone, enable notifications from the app opened through its Home Screen icon.")}</p>
         <button className="primary" disabled={notificationBusy}>{notificationBusy ? l("Se salvează...", "Saving...") : l("Salvează notificările", "Save notifications")}</button>

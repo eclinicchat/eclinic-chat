@@ -1,4 +1,6 @@
-# eClinTalk v1.13.0
+# eClinTalk v1.13.1
+
+Versiunea v1.13.1 clarifica diferenta dintre preferinta de notificare a grupului si activarea notificarilor pe dispozitiv. Cand grupul permite notificari, dar dispozitivul nu este activat, apare un avertisment scurt si vizibil. Avertismentul dispare automat dupa activarea notificarilor pe dispozitiv.
 
 Versiunea v1.13.0 aduce o interfata vizuala mai unitara si mai profesionala: tipografie si culori simplificate, iconuri consecvente, meniu lateral si ferestre reorganizate, mesaje si controale mai curate. Include cautarea rapida a grupurilor, draft separat pentru fiecare conversatie, delimitatoare de data si mesaje noi, reply cu miniatura pentru imagini si un selector extins de emoticoane organizat pe categorii, cu lista recenta.
 
