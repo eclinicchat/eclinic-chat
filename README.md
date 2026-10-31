@@ -1,4 +1,12 @@
-# eClinTalk v1.17.0
+# eClinTalk v1.17.1
+
+Versiunea v1.17.1 imbunatateste invitatia trimisa prin e-mail. Mesajul precompletat explica scopul eClinTalk, functiile principale, compatibilitatea cu Mac, Windows, iPhone/iPad si Android si pasii prin care aplicatia se instaleaza pe telefon sau calculator si se deschide din pictograma proprie, asemenea unei aplicatii obisnuite. Mesajul este generat in limba selectata in interfata: romana, engleza, franceza sau spaniola. Include linkul de invitatie valabil 7 zile, instructiuni pentru notificari si avertismentul ca versiunea este destinata testarii fara date medicale sau personale reale despre pacienti.
+
+Butonul **E-mail** deschide aplicatia de e-mail a dispozitivului cu destinatarul, subiectul si continutul completate. Utilizatorul verifica si trimite mesajul; eClinTalk nu expediaza automat e-mailul. Textul WhatsApp ramane scurt si usor de trimis.
+
+Actualizarea v1.17.1 nu necesita niciun script SQL nou.
+
+## Versiunea v1.17.0
 
 Versiunea v1.17.0 permite administratorului comunitatii sa stabileasca ulterior, prin bife, clinicile/grupurile vizibile pentru fiecare membru. Un administrator al comunitatii nu vede grupurile protejate cu parola daca nu a fost invitat in ele. Accesul la aceste grupuri poate fi acordat numai de administratorul grupului sau de administratorul general. Accesul de proprietar sau administrator al unui grup nu poate fi retras accidental din acest ecran. Fereastra de administrare poate fi derulata complet pe iPhone si Android, inclusiv cand lista membrilor sau a clinicilor este lunga.
 
