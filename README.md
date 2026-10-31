@@ -1,6 +1,8 @@
-# eClinTalk v1.15.0
+# eClinTalk v1.16.0
 
-Versiunea v1.15.0 inchide selectorul de emoji imediat dupa alegere si readuce focusul in campul mesajului. Administrarea comunitatii permite adaugarea persoanelor numai in comunitate, in toate grupurile eligibile existente sau in unul ori mai multe grupuri selectate. Grupurile create ulterior nu sunt incluse automat. Grupurile protejate cu parola sunt excluse din operatiile in masa si membrii lor se adauga separat din setarile grupului. Include temele si corectiile din v1.14.1.
+Versiunea v1.16.0 permite administratorului general sa administreze membrii oricarei comunitati, inclusiv „Birou”, imbunatateste contrastul in temele luminoasa si intunecata si adauga interfata in franceza si spaniola, alaturi de romana si engleza. Limba este detectata automat la prima deschidere si poate fi schimbata din ecranul de conectare sau din profil.
+
+Versiunea include si functionalitatile v1.15.0: selectorul de emoji se inchide imediat dupa alegere, iar administrarea comunitatii permite adaugarea persoanelor numai in comunitate, in toate grupurile eligibile existente sau in grupurile selectate. Grupurile protejate cu parola sunt excluse din operatiile in masa.
 
 Aceasta versiune ramane destinata testarii si comunicarii fara date reale de pacient. Actualizarea nu reprezinta certificare GDPR si nu necesita niciun script SQL nou.
 

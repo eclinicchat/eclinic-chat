@@ -101,3 +101,13 @@ header{min-height:72px;padding:13px 22px;background:#0a1623cc;backdrop-filter:bl
 
 /* v1.15 — administrarea membrilor si selectorul de emoji */
 .inviteScope{gap:11px}.inviteScope .checkLabel{font-weight:600}.groupChoiceList{display:grid;gap:8px;margin:0 0 2px 27px;padding:10px 12px;border-left:2px solid var(--line);background:#08152266;border-radius:0 9px 9px 0}.protectedGroupNote{display:flex;align-items:flex-start;gap:7px;margin:2px 0 0;padding:9px 10px;border:1px solid #8a6329;border-radius:9px;background:#3a2a1499;color:#ffd58a;font-size:11px;line-height:1.4}:root[data-theme="light"] .groupChoiceList{background:#edf4fa}:root[data-theme="light"] .protectedGroupNote{background:#fff4d8;color:#654712;border-color:#a37724}
+
+/* v1.16 — contrast consolidat si patru limbi */
+:root[data-theme="dark"]{--line:#60748d;--muted:#b3c0d0}
+.languageSwitch{flex-wrap:wrap;justify-content:flex-end;max-width:190px}.languageSwitch button{border-color:#60748d;color:#dce7f3}.languageSwitch button.active{background:#245f9f;border-color:#81b9fa;color:#fff}
+.communityNav>button.selected,.conv.active{background:#203c5d;box-shadow:inset 4px 0 #72b0ff}.manageCommunityBtn,.headerActions button{border-color:#60748d}.roomSearch input{border-color:#60748d}.muted,.helper,.communityEmpty,.conv small,.user small,header small,.profileBtn small,.memberRow small,.sectionHeading small{color:var(--muted)}
+:root[data-theme="light"]{--line:#70849c;--muted:#42556d}
+:root[data-theme="light"] .languageSwitch button{color:#20344b;border-color:#70849c}:root[data-theme="light"] .languageSwitch button.active{background:#155fae;border-color:#155fae;color:#fff}
+:root[data-theme="light"] .communityNav>button.selected,:root[data-theme="light"] .conv.active{background:#cbdff2;box-shadow:inset 4px 0 #125cae}
+:root[data-theme="light"] .manageCommunityBtn,:root[data-theme="light"] .headerActions button,:root[data-theme="light"] .roomSearch input{border-color:#70849c}
+@media(prefers-contrast:more){:root{--line:#91a6bf;--muted:#d0dae6}:root[data-theme="light"]{--line:#526981;--muted:#263b53}.communityNav>button.selected,.conv.active{box-shadow:inset 5px 0 #8bc2ff,0 0 0 1px var(--line)}button,input,textarea,select,.bubble,.modal{border-width:2px}}

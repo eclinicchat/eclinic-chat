@@ -2,16 +2,24 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { EXTRA_TRANSLATIONS } from "./i18n-extra";
 
-const time = (value, language = "ro") => new Date(value).toLocaleTimeString(language === "en" ? "en-GB" : "ro-RO", { hour: "2-digit", minute: "2-digit" });
-const localize = (language, ro, en) => language === "en" ? en : ro;
+const LANGUAGE_LOCALES = { ro: "ro-RO", en: "en-GB", fr: "fr-FR", es: "es-ES" };
+const SUPPORTED_LANGUAGES = Object.keys(LANGUAGE_LOCALES);
+const time = (value, language = "ro") => new Date(value).toLocaleTimeString(LANGUAGE_LOCALES[language] || LANGUAGE_LOCALES.ro, { hour: "2-digit", minute: "2-digit" });
+const localize = (language, ro, en, fr, es) => {
+  if (language === "ro") return ro;
+  if (language === "fr") return fr || EXTRA_TRANSLATIONS.fr?.[en] || en;
+  if (language === "es") return es || EXTRA_TRANSLATIONS.es?.[en] || en;
+  return en;
+};
 const INACTIVITY_MS = 15 * 60 * 1000;
 const WARNING_MS = 60 * 1000;
 const EMOJI_CATEGORIES = [
-  { id: "faces", ro: "Expresii", en: "Faces", icon: "😊", items: ["😀","😃","😄","😁","😂","🤣","😊","😇","🙂","🙃","😉","😍","🥰","😘","😎","🤩","🤔","🫡","🙄","😮","😢","😭","😡","🤗","😴","🥳"] },
-  { id: "gestures", ro: "Gesturi", en: "Gestures", icon: "👍", items: ["👍","👎","👏","🙌","🙏","🤝","💪","👌","✌️","🤞","🫶","👋","☝️","💬","👀","🧠"] },
-  { id: "symbols", ro: "Simboluri", en: "Symbols", icon: "❤️", items: ["❤️","💙","💚","🧡","💜","🤍","🔥","✨","🎉","✅","❌","⚠️","📌","💡","💯","⭐","❗","❓"] },
-  { id: "medical", ro: "Medical", en: "Medical", icon: "🩺", items: ["🩺","🏥","🚑","💊","💉","🩻","🧬","🧪","🦠","🫀","🫁","🧠","🩹","📋","📷","🔬"] },
+  { id: "faces", ro: "Expresii", en: "Faces", fr: "Expressions", es: "Caras", icon: "😊", items: ["😀","😃","😄","😁","😂","🤣","😊","😇","🙂","🙃","😉","😍","🥰","😘","😎","🤩","🤔","🫡","🙄","😮","😢","😭","😡","🤗","😴","🥳"] },
+  { id: "gestures", ro: "Gesturi", en: "Gestures", fr: "Gestes", es: "Gestos", icon: "👍", items: ["👍","👎","👏","🙌","🙏","🤝","💪","👌","✌️","🤞","🫶","👋","☝️","💬","👀","🧠"] },
+  { id: "symbols", ro: "Simboluri", en: "Symbols", fr: "Symboles", es: "Símbolos", icon: "❤️", items: ["❤️","💙","💚","🧡","💜","🤍","🔥","✨","🎉","✅","❌","⚠️","📌","💡","💯","⭐","❗","❓"] },
+  { id: "medical", ro: "Medical", en: "Medical", fr: "Médical", es: "Médico", icon: "🩺", items: ["🩺","🏥","🚑","💊","💉","🩻","🧬","🧪","🦠","🫀","🫁","🧠","🩹","📋","📷","🔬"] },
 ];
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "🤣", "😮", "😢", "👏", "🙏", "🔥", "✅", "👀", "💯"];
 
@@ -36,9 +44,9 @@ function dayLabel(value, language) {
   const date = new Date(value);
   const today = new Date();
   const yesterday = new Date(); yesterday.setDate(today.getDate()-1);
-  if (date.toDateString() === today.toDateString()) return language === "en" ? "Today" : "Astăzi";
-  if (date.toDateString() === yesterday.toDateString()) return language === "en" ? "Yesterday" : "Ieri";
-  return date.toLocaleDateString(language === "en" ? "en-GB" : "ro-RO", { day:"numeric", month:"long", year: date.getFullYear() === today.getFullYear() ? undefined : "numeric" });
+  if (date.toDateString() === today.toDateString()) return localize(language, "Astăzi", "Today", "Aujourd’hui", "Hoy");
+  if (date.toDateString() === yesterday.toDateString()) return localize(language, "Ieri", "Yesterday", "Hier", "Ayer");
+  return date.toLocaleDateString(LANGUAGE_LOCALES[language] || LANGUAGE_LOCALES.ro, { day:"numeric", month:"long", year: date.getFullYear() === today.getFullYear() ? undefined : "numeric" });
 }
 
 const UI = {
@@ -69,6 +77,34 @@ const UI = {
     resumeNotifications: "Resume notifications", profile: "Profile", displayName: "Display name", language: "Interface language",
     save: "Save", cancel: "Cancel", accountSettings: "Account settings", createdBy: "Created by eClinic Hub",
     mentionHint: "Mention a member", loading: "Loading...", groupWithoutCommunity: "no community",
+  },
+  fr: {
+    secureSignIn: "Connexion sécurisée", privateHelp: "Les conversations ne sont visibles que par les membres ajoutés.",
+    email: "E-mail", password: "Mot de passe", enterApp: "Ouvrir l’application", processing: "Traitement…",
+    forgot: "Mot de passe oublié ?", noAccount: "Pas de compte ? Créer un compte", testWarning: "Version de test. Ne saisissez pas de données médicales ou personnelles réelles.",
+    myConversations: "Mes conversations", allConversations: "Toutes les conversations", otherGroups: "Groupes sans communauté",
+    communities: "Mes communautés", newGroup: "+ Nouveau groupe", settings: "⚙️ Paramètres", pin: "📌 Épingler", pinned: "📌 Épinglé",
+    logout: "Déconnexion", connected: "Connecté", generalAdmin: "Administrateur général", members: "membres",
+    yourConversations: "Vos conversations", chooseConversation: "Choisissez une conversation pour l’ouvrir.",
+    noConversations: "Aucune conversation n’est encore disponible.", firstGroup: "Créer le premier groupe",
+    messagePlaceholder: "Écrire un message…", send: "Envoyer", sending: "Envoi…",
+    resumeNotifications: "Réactiver les notifications", profile: "Profil", displayName: "Nom affiché", language: "Langue de l’interface",
+    save: "Enregistrer", cancel: "Annuler", accountSettings: "Paramètres du compte", createdBy: "Créé par eClinic Hub",
+    mentionHint: "Mentionner un membre", loading: "Chargement…", groupWithoutCommunity: "sans communauté",
+  },
+  es: {
+    secureSignIn: "Conexión segura", privateHelp: "Las conversaciones solo son visibles para los miembros añadidos.",
+    email: "Correo electrónico", password: "Contraseña", enterApp: "Abrir aplicación", processing: "Procesando…",
+    forgot: "¿Olvidaste la contraseña?", noAccount: "¿No tienes cuenta? Crear una", testWarning: "Versión de prueba. No introduzcas datos médicos ni personales reales.",
+    myConversations: "Mis conversaciones", allConversations: "Todas las conversaciones", otherGroups: "Grupos sin comunidad",
+    communities: "Mis comunidades", newGroup: "+ Nuevo grupo", settings: "⚙️ Ajustes", pin: "📌 Fijar", pinned: "📌 Fijado",
+    logout: "Cerrar sesión", connected: "Conectado", generalAdmin: "Administrador general", members: "miembros",
+    yourConversations: "Tus conversaciones", chooseConversation: "Elige una conversación para abrirla.",
+    noConversations: "Todavía no hay conversaciones disponibles.", firstGroup: "Crear el primer grupo",
+    messagePlaceholder: "Escribe un mensaje…", send: "Enviar", sending: "Enviando…",
+    resumeNotifications: "Reanudar notificaciones", profile: "Perfil", displayName: "Nombre mostrado", language: "Idioma de la interfaz",
+    save: "Guardar", cancel: "Cancelar", accountSettings: "Ajustes de la cuenta", createdBy: "Creado por eClinic Hub",
+    mentionHint: "Mencionar a un miembro", loading: "Cargando…", groupWithoutCommunity: "sin comunidad",
   },
 };
 
@@ -116,6 +152,7 @@ async function requestPasswordManagerSave(email, password) {
 
 function Login({ language, setLanguage, inviteToken }) {
   const t = translator(language);
+  const l = (ro, en, fr, es) => localize(language, ro, en, fr, es);
   const [signup, setSignup] = useState(false);
   const [forgotPassword, setForgotPassword] = useState(false);
   const [email, setEmail] = useState("");
@@ -130,7 +167,7 @@ function Login({ language, setLanguage, inviteToken }) {
     supabase.rpc("get_invitation_preview", { invitation_token: inviteToken }).then(({ data, error }) => {
       const preview = data?.[0];
       if (error || !preview?.is_valid) {
-        setNotice({ error: true, text: language === "en" ? "This invitation is invalid or has expired." : "Această invitație nu este validă sau a expirat." });
+        setNotice({ error: true, text: l("Această invitație nu este validă sau a expirat.", "This invitation is invalid or has expired.", "Cette invitation n’est pas valide ou a expiré.", "Esta invitación no es válida o ha caducado.") });
         return;
       }
       setInvitePreview(preview);
@@ -156,13 +193,13 @@ function Login({ language, setLanguage, inviteToken }) {
         : await supabase.auth.signInWithPassword({ email: submittedEmail, password: submittedPassword });
       if (result.error) setNotice({ error: true, text: result.error.message });
       else if (signup && !result.data.session) {
-        setNotice({ text: language === "en" ? "Account created. Check your email, then sign in." : "Cont creat. Verifică emailul, apoi conectează-te." });
+        setNotice({ text: l("Cont creat. Verifică emailul, apoi conectează-te.", "Account created. Check your email, then sign in.", "Compte créé. Consultez votre e-mail, puis connectez-vous.", "Cuenta creada. Revisa tu correo y después inicia sesión.") });
         setSignup(false);
       } else {
         await requestPasswordManagerSave(submittedEmail, submittedPassword);
       }
     } catch {
-      setNotice({ error: true, text: language === "en" ? "The authentication service could not be reached. Please try again." : "Serviciul de autentificare nu poate fi contactat. Încearcă din nou." });
+      setNotice({ error: true, text: l("Serviciul de autentificare nu poate fi contactat. Încearcă din nou.", "The authentication service could not be reached. Please try again.", "Le service d’authentification est inaccessible. Réessayez.", "No se pudo contactar con el servicio de autenticación. Inténtalo de nuevo.") });
     } finally {
       setBusy(false);
     }
@@ -177,39 +214,39 @@ function Login({ language, setLanguage, inviteToken }) {
       redirectTo: `${window.location.origin}/?recovery=1`,
     });
     if (error) setNotice({ error: true, text: error.message });
-    else setNotice({ text: language === "en" ? "If an account exists for this address, you will receive a password reset email." : "Dacă adresa are un cont, vei primi un email pentru alegerea unei parole noi." });
+    else setNotice({ text: l("Dacă adresa are un cont, vei primi un email pentru alegerea unei parole noi.", "If an account exists for this address, you will receive a password reset email.", "Si un compte existe pour cette adresse, vous recevrez un e-mail de réinitialisation.", "Si existe una cuenta para esta dirección, recibirás un correo para restablecer la contraseña.") });
     setBusy(false);
   }
 
   return <main className="loginShell"><section className="loginCard" aria-labelledby="login-title">
-    <div className="loginTop"><div className="logo" aria-hidden="true">eC</div><div className="languageSwitch" role="group" aria-label={language === "en" ? "Interface language" : "Limba interfeței"}><button aria-pressed={language === "ro"} className={language === "ro" ? "active" : ""} onClick={() => setLanguage("ro")}>RO</button><button aria-pressed={language === "en"} className={language === "en" ? "active" : ""} onClick={() => setLanguage("en")}>EN</button></div></div>
+    <div className="loginTop"><div className="logo" aria-hidden="true">eC</div><div className="languageSwitch" role="group" aria-label={t("language")}><button aria-pressed={language === "ro"} className={language === "ro" ? "active" : ""} onClick={() => setLanguage("ro")}>RO</button><button aria-pressed={language === "en"} className={language === "en" ? "active" : ""} onClick={() => setLanguage("en")}>EN</button><button aria-pressed={language === "fr"} className={language === "fr" ? "active" : ""} onClick={() => setLanguage("fr")}>FR</button><button aria-pressed={language === "es"} className={language === "es" ? "active" : ""} onClick={() => setLanguage("es")}>ES</button></div></div>
     <p className="appName">eClinTalk</p>
-    <h1 id="login-title">{forgotPassword ? (language === "en" ? "Reset password" : "Recuperează parola") : signup ? (language === "en" ? "Create account" : "Creează cont") : t("secureSignIn")}</h1>
+    <h1 id="login-title">{forgotPassword ? l("Recuperează parola", "Reset password", "Réinitialiser le mot de passe", "Restablecer contraseña") : signup ? l("Creează cont", "Create account", "Créer un compte", "Crear cuenta") : t("secureSignIn")}</h1>
     <p className="muted">{t("privateHelp")}</p>
-    {invitePreview && <div className="inviteBanner"><strong>{language === "en" ? `Invitation to ${invitePreview.community_name}` : `Invitație în ${invitePreview.community_name}`}</strong><span>{language === "en" ? `Continue with ${invitePreview.invitee_email}.` : `Continuă cu adresa ${invitePreview.invitee_email}.`}</span></div>}
+    {invitePreview && <div className="inviteBanner"><strong>{l(`Invitație în ${invitePreview.community_name}`, `Invitation to ${invitePreview.community_name}`, `Invitation à ${invitePreview.community_name}`, `Invitación a ${invitePreview.community_name}`)}</strong><span>{l(`Continuă cu adresa ${invitePreview.invitee_email}.`, `Continue with ${invitePreview.invitee_email}.`, `Continuez avec ${invitePreview.invitee_email}.`, `Continúa con ${invitePreview.invitee_email}.`)}</span></div>}
     {forgotPassword ? <form id="recovery-form" name="recovery" onSubmit={sendResetLink} className="form" autoComplete="on" method="post">
       <label htmlFor="recovery-email">{t("email")}<input id="recovery-email" name="email" type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
       {notice && <p role={notice.error ? "alert" : "status"} className={notice.error ? "error" : "success"}>{notice.text}</p>}
-      <button disabled={busy} className="primary">{busy ? (language === "en" ? "Sending..." : "Se trimite...") : (language === "en" ? "Send recovery link" : "Trimite linkul de recuperare")}</button>
+      <button disabled={busy} className="primary">{busy ? l("Se trimite...", "Sending...", "Envoi…", "Enviando…") : l("Trimite linkul de recuperare", "Send recovery link", "Envoyer le lien de récupération", "Enviar enlace de recuperación")}</button>
     </form> : <form id={signup ? "signup-form" : "login-form"} name={signup ? "signup" : "login"} onSubmit={submit} className="form" autoComplete="on" method="post">
       <label htmlFor={signup ? "signup-email" : "login-email"}>{t("email")}<input id={signup ? "signup-email" : "login-email"} name="email" type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="username" enterKeyHint="next" autoFocus required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
-      <label htmlFor={signup ? "new-password" : "current-password"}>{t("password")}<span className="passwordField"><input id={signup ? "new-password" : "current-password"} name="password" type={showPassword ? "text" : "password"} autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete={signup ? "new-password" : "current-password"} enterKeyHint="go" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} /><button type="button" className="passwordToggle" aria-label={showPassword ? (language === "en" ? "Hide password" : "Ascunde parola") : (language === "en" ? "Show password" : "Arată parola")} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? "🙈" : "👁️"}</button></span></label>
+      <label htmlFor={signup ? "new-password" : "current-password"}>{t("password")}<span className="passwordField"><input id={signup ? "new-password" : "current-password"} name="password" type={showPassword ? "text" : "password"} autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete={signup ? "new-password" : "current-password"} enterKeyHint="go" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} /><button type="button" className="passwordToggle" aria-label={showPassword ? l("Ascunde parola", "Hide password", "Masquer le mot de passe", "Ocultar contraseña") : l("Arată parola", "Show password", "Afficher le mot de passe", "Mostrar contraseña")} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? "🙈" : "👁️"}</button></span></label>
       {notice && <p role={notice.error ? "alert" : "status"} className={notice.error ? "error" : "success"}>{notice.text}</p>}
-      <button type="submit" disabled={busy} className="primary">{busy ? t("processing") : signup ? (language === "en" ? "Create account" : "Creează cont") : t("enterApp")}</button>
-      {!signup && <p className="passwordHelp">{language === "en" ? "Saved credentials are securely filled and managed by your device's password manager." : "Datele salvate sunt completate și administrate în siguranță de managerul de parole al dispozitivului."}</p>}
+      <button type="submit" disabled={busy} className="primary">{busy ? t("processing") : signup ? l("Creează cont", "Create account", "Créer un compte", "Crear cuenta") : t("enterApp")}</button>
+      {!signup && <p className="passwordHelp">{l("Datele salvate sunt completate și administrate în siguranță de managerul de parole al dispozitivului.", "Saved credentials are securely filled and managed by your device's password manager.", "Les identifiants enregistrés sont remplis et gérés en toute sécurité par le gestionnaire de mots de passe de votre appareil.", "Las credenciales guardadas se completan y administran de forma segura mediante el gestor de contraseñas del dispositivo.")}</p>}
     </form>}
     {!forgotPassword && !signup && <button className="linkBtn" onClick={() => { setForgotPassword(true); setNotice(null); }}>
       {t("forgot")}
     </button>}
     <button className="linkBtn" onClick={() => { setForgotPassword(false); setSignup(forgotPassword ? false : !signup); setNotice(null); }}>
-      {forgotPassword ? (language === "en" ? "Back to sign-in" : "Înapoi la conectare") : signup ? (language === "en" ? "Already have an account? Sign in" : "Ai deja cont? Conectează-te") : t("noAccount")}
+      {forgotPassword ? l("Înapoi la conectare", "Back to sign-in", "Retour à la connexion", "Volver al inicio de sesión") : signup ? l("Ai deja cont? Conectează-te", "Already have an account? Sign in", "Vous avez déjà un compte ? Connectez-vous", "¿Ya tienes cuenta? Inicia sesión") : t("noAccount")}
     </button>
     <p className="note safetyNotice" role="note"><span aria-hidden="true">⚠</span>{t("testWarning")}</p><p className="poweredBy">{t("createdBy")}</p>
   </section></main>;
 }
 
 function UpdatePassword({ completed, language }) {
-  const l = (ro, en) => localize(language, ro, en);
+  const l = (ro, en, fr, es) => localize(language, ro, en, fr, es);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -248,7 +285,7 @@ function UpdatePassword({ completed, language }) {
 }
 
 function NewConversation({ close, created, communities, selectedCommunityId, isGeneralAdmin, language }) {
-  const l = (ro, en) => localize(language, ro, en);
+  const l = (ro, en, fr, es) => localize(language, ro, en, fr, es);
   const [title, setTitle] = useState("");
   const [emails, setEmails] = useState("");
   const allowedCommunities = communities.filter((item) => item.my_is_admin);
@@ -293,7 +330,7 @@ function NewConversation({ close, created, communities, selectedCommunityId, isG
 }
 
 function NewCommunity({ close, created, language }) {
-  const l = (ro, en) => localize(language, ro, en);
+  const l = (ro, en, fr, es) => localize(language, ro, en, fr, es);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
@@ -319,7 +356,7 @@ function NewCommunity({ close, created, language }) {
 
 function Chat({ session, language, setLanguage, themePreference, setThemePreference, inviteToken, invitationCompleted }) {
   const t = translator(language);
-  const l = (ro, en) => localize(language, ro, en);
+  const l = (ro, en, fr, es) => localize(language, ro, en, fr, es);
   const [rooms, setRooms] = useState([]);
   const [communities, setCommunities] = useState([]);
   const [selectedCommunityId, setSelectedCommunityId] = useState("all");
@@ -608,7 +645,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     supabase.rpc("accept_community_invitation", { invitation_token: inviteToken }).then(async ({ data, error: invitationError }) => {
       if (!active) return;
       if (invitationError) {
-        setInviteStatus(l(`Invitația nu a putut fi acceptată: ${invitationError.message}`, `The invitation could not be accepted: ${invitationError.message}`));
+        setInviteStatus(l(`Invitația nu a putut fi acceptată: ${invitationError.message}`, `The invitation could not be accepted: ${invitationError.message}`, `L’invitation n’a pas pu être acceptée : ${invitationError.message}`, `No se pudo aceptar la invitación: ${invitationError.message}`));
         return;
       }
       const accepted = data?.[0];
@@ -616,6 +653,8 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
       setInviteStatus(l(
         `Ai fost adăugat în comunitatea ${accepted?.community_name || "selectată"}${accepted?.groups_added ? ` și în ${accepted.groups_added} grupuri` : ""}.`,
         `You joined ${accepted?.community_name || "the selected community"}${accepted?.groups_added ? ` and ${accepted.groups_added} groups` : ""}.`,
+        `Vous avez rejoint ${accepted?.community_name || "la communauté sélectionnée"}${accepted?.groups_added ? ` et ${accepted.groups_added} groupes` : ""}.`,
+        `Te has unido a ${accepted?.community_name || "la comunidad seleccionada"}${accepted?.groups_added ? ` y a ${accepted.groups_added} grupos` : ""}.`,
       ));
       invitationCompleted();
     });
@@ -931,6 +970,8 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
       setCommunityNotice(l(
         `${addedCount ? `${addedCount} conturi existente au fost adăugate. ` : ""}${links.length ? `${links.length} linkuri de invitație au fost create.` : ""}`.trim(),
         `${addedCount ? `${addedCount} existing accounts were added. ` : ""}${links.length ? `${links.length} invitation links were created.` : ""}`.trim(),
+        `${addedCount ? `${addedCount} comptes existants ont été ajoutés. ` : ""}${links.length ? `${links.length} liens d’invitation ont été créés.` : ""}`.trim(),
+        `${addedCount ? `Se añadieron ${addedCount} cuentas existentes. ` : ""}${links.length ? `Se crearon ${links.length} enlaces de invitación.` : ""}`.trim(),
       ));
     }
     setCommunityBusy(false);
@@ -939,14 +980,14 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   async function copyInvitation(link) {
     try {
       await navigator.clipboard.writeText(link.url);
-      setCommunityNotice(l(`Linkul pentru ${link.email} a fost copiat.`, `The link for ${link.email} was copied.`));
+      setCommunityNotice(l(`Linkul pentru ${link.email} a fost copiat.`, `The link for ${link.email} was copied.`, `Le lien pour ${link.email} a été copié.`, `Se copió el enlace para ${link.email}.`));
     } catch {
       setCommunityError(l("Linkul nu a putut fi copiat automat. Selectează-l și copiază-l manual.", "The link could not be copied automatically. Select and copy it manually."));
     }
   }
 
   async function toggleCommunityAdmin(member) {
-    if (!selectedCommunity || communityBusy || !window.confirm(member.is_admin ? l(`Retragi rolul de administrator pentru ${member.email}?`, `Remove administrator access from ${member.email}?`) : l(`Acordezi rolul de administrator lui ${member.email}?`, `Grant administrator access to ${member.email}?`))) return;
+    if (!selectedCommunity || communityBusy || !window.confirm(member.is_admin ? l(`Retragi rolul de administrator pentru ${member.email}?`, `Remove administrator access from ${member.email}?`, `Retirer le rôle d’administrateur à ${member.email} ?`, `¿Quitar el rol de administrador a ${member.email}?`) : l(`Acordezi rolul de administrator lui ${member.email}?`, `Grant administrator access to ${member.email}?`, `Accorder le rôle d’administrateur à ${member.email} ?`, `¿Conceder el rol de administrador a ${member.email}?`))) return;
     setCommunityBusy(true); setCommunityError(""); setCommunityNotice("");
     const { error: adminError } = await supabase.rpc("set_community_admin", {
       target_community_id: selectedCommunity.id,target_user_id: member.user_id,make_admin: !member.is_admin,
@@ -956,7 +997,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   }
 
   async function removeCommunityMember(member) {
-    if (!selectedCommunity || communityBusy || !window.confirm(l(`Elimini ${member.email} din comunitate și din grupurile ei?`, `Remove ${member.email} from the community and its groups?`))) return;
+    if (!selectedCommunity || communityBusy || !window.confirm(l(`Elimini ${member.email} din comunitate și din grupurile ei?`, `Remove ${member.email} from the community and its groups?`, `Retirer ${member.email} de la communauté et de ses groupes ?`, `¿Eliminar a ${member.email} de la comunidad y de sus grupos?`))) return;
     setCommunityBusy(true); setCommunityError(""); setCommunityNotice("");
     const { error: removeError } = await supabase.rpc("remove_community_member", {
       target_community_id: selectedCommunity.id,target_user_id: member.user_id,
@@ -1126,7 +1167,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   }
 
   async function removeMember(member) {
-    if (settingsBusy || !window.confirm(l(`Elimini ${member.email} din conversație?`, `Remove ${member.email} from the conversation?`))) return;
+    if (settingsBusy || !window.confirm(l(`Elimini ${member.email} din conversație?`, `Remove ${member.email} from the conversation?`, `Retirer ${member.email} de la conversation ?`, `¿Eliminar a ${member.email} de la conversación?`))) return;
     setSettingsBusy(true); setSettingsError("");
     const { error: removeError } = await supabase.rpc("remove_conversation_member", {
       target_conversation_id: roomId, target_user_id: member.user_id,
@@ -1137,7 +1178,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   }
 
   async function toggleAdmin(member) {
-    if (settingsBusy || !window.confirm(member.is_admin ? l(`Retragi rolul de administrator pentru ${member.email}?`, `Remove administrator access from ${member.email}?`) : l(`Acordezi rolul de administrator lui ${member.email}?`, `Grant administrator access to ${member.email}?`))) return;
+    if (settingsBusy || !window.confirm(member.is_admin ? l(`Retragi rolul de administrator pentru ${member.email}?`, `Remove administrator access from ${member.email}?`, `Retirer le rôle d’administrateur à ${member.email} ?`, `¿Quitar el rol de administrador a ${member.email}?`) : l(`Acordezi rolul de administrator lui ${member.email}?`, `Grant administrator access to ${member.email}?`, `Accorder le rôle d’administrateur à ${member.email} ?`, `¿Conceder el rol de administrador a ${member.email}?`))) return;
     setSettingsBusy(true); setSettingsError("");
     const { error: adminError } = await supabase.rpc("set_conversation_admin", {
       target_conversation_id: roomId, target_user_id: member.user_id, make_admin: !member.is_admin,
@@ -1215,8 +1256,8 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
         </button>)}
         {rooms.some((item) => !item.community_id) && <button aria-pressed={selectedCommunityId === "private"} className={selectedCommunityId === "private" ? "selected" : ""} onClick={() => chooseCommunity("private")}>◇ {t("otherGroups")}</button>}
       </div>
-      {selectedCommunity?.my_is_admin && <button className="manageCommunityBtn" onClick={openCommunitySettings}><Icon name="users" size={16}/>{l("Membri și setări", "Members and settings")}</button>}
-      {canCreateGroup && <button className="primary newBtn" onClick={() => setModal(true)}>{selectedCommunity ? l(`+ Grup nou în ${selectedCommunity.name}`, `+ New group in ${selectedCommunity.name}`) : t("newGroup")}</button>}
+      {(selectedCommunity?.my_is_admin || isGeneralAdmin) && <button className="manageCommunityBtn" onClick={openCommunitySettings}><Icon name="users" size={16}/>{l("Membri și setări", "Members and settings")}</button>}
+      {canCreateGroup && <button className="primary newBtn" onClick={() => setModal(true)}>{selectedCommunity ? l(`+ Grup nou în ${selectedCommunity.name}`, `+ New group in ${selectedCommunity.name}`, `+ Nouveau groupe dans ${selectedCommunity.name}`, `+ Nuevo grupo en ${selectedCommunity.name}`) : t("newGroup")}</button>}
       <label className="roomSearch"><Icon name="search" size={16}/><input value={roomSearch} onChange={(event) => setRoomSearch(event.target.value)} placeholder={l("Caută grupuri", "Search groups")} aria-label={l("Caută grupuri", "Search groups")} /></label>
       <nav className="conversationList" aria-label={l("Lista conversațiilor", "Conversation list")}>
         {loading && <p className="status">{t("loading")}</p>}
@@ -1230,7 +1271,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     </aside>
     {mobileMenuOpen && <button className="sideBackdrop" onClick={() => setMobileMenuOpen(false)} aria-label={l("Închide meniul", "Close menu")} />}
     {inviteStatus && <div className="inviteToast" role="status"><span>{inviteStatus}</span><button onClick={() => setInviteStatus("")} aria-label={l("Închide", "Close")}>×</button></div>}
-    <section id="conversation-content" tabIndex="-1" aria-label={room ? l(`Conversația ${room.title}`, `${room.title} conversation`) : t("yourConversations")} className={`chat ${room ? "" : "chatEmpty"}`}>
+    <section id="conversation-content" tabIndex="-1" aria-label={room ? l(`Conversația ${room.title}`, `${room.title} conversation`, `Conversation ${room.title}`, `Conversación ${room.title}`) : t("yourConversations")} className={`chat ${room ? "" : "chatEmpty"}`}>
       {room ? <><header><button className="mobileMenuBtn iconTextBtn" onClick={() => setMobileMenuOpen(true)} aria-controls="group-menu" aria-expanded={mobileMenuOpen}><Icon name="menu"/><span className="srOnly">{l("Meniu", "Menu")}</span></button><div className="headerMain"><strong>{room.title}</strong><small>{room.member_count} {t("members")} · {room.community_name || t("groupWithoutCommunity")} · {l("numai membrii au acces", "members only")}</small></div><div className="headerActions"><b>● {l("Privat", "Private")}</b><button className="iconTextBtn" onClick={toggleGroupPin}><Icon name="pin" size={16}/>{room.is_pinned ? l("Fixat", "Pinned") : "Pin"}</button><button className="iconTextBtn" onClick={openSettings}><Icon name="settings" size={16}/>{l("Setări", "Settings")}</button></div></header>
         <div className="warning" role="note"><span aria-hidden="true">⚠</span>{t("testWarning")}</div>
         <div className="msgs" role="log" aria-live="polite" aria-relevant="additions text" aria-label={l("Mesaje", "Messages")}>
@@ -1265,8 +1306,8 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
             {!item.deleted_at && <div className="messageActions"><button onClick={() => setReplyTo(item)}><Icon name="reply" size={15}/>{l("Răspunde", "Reply")}</button><button onClick={() => setReactionTarget(reactionTarget === item.id ? null : item.id)}><Icon name="smile" size={15}/>{l("Reacție", "React")}</button>
               {room.my_is_admin && <button onClick={() => toggleMessagePin(item.id)}><Icon name="pin" size={15}/>{item.pinned_at ? l("Anulează pin", "Unpin") : "Pin"}</button>}
               {(mine || room.my_is_admin) && <button className="deleteMessageBtn" disabled={deletingMessageId === item.id} onClick={() => deleteMessage(item)}><Icon name="trash" size={15}/>{deletingMessageId === item.id ? l("Se șterge...", "Deleting...") : l("Șterge", "Delete")}</button>}</div>}
-            {!item.deleted_at && reactionTarget === item.id && <div className="reactionPicker" role="group" aria-label={l("Alege reacția", "Choose reaction")}>{REACTION_EMOJIS.map((emoji) => <button aria-label={l(`Reacție ${emoji}`, `React ${emoji}`)} key={emoji} onClick={() => reactToMessage(item.id, emoji)}>{emoji}</button>)}</div>}
-            {!item.deleted_at && Object.keys(itemReactions).length > 0 && <div className="reactionSummary">{Object.entries(itemReactions).map(([emoji, info]) => <button aria-label={l(`${info.count} reacții ${emoji}`, `${info.count} ${emoji} reactions`)} className={info.mine ? "mine" : ""} key={emoji} onClick={() => reactToMessage(item.id, emoji)}>{emoji} {info.count}</button>)}</div>}
+            {!item.deleted_at && reactionTarget === item.id && <div className="reactionPicker" role="group" aria-label={l("Alege reacția", "Choose reaction")}>{REACTION_EMOJIS.map((emoji) => <button aria-label={l(`Reacție ${emoji}`, `React ${emoji}`, `Réagir avec ${emoji}`, `Reaccionar con ${emoji}`)} key={emoji} onClick={() => reactToMessage(item.id, emoji)}>{emoji}</button>)}</div>}
+            {!item.deleted_at && Object.keys(itemReactions).length > 0 && <div className="reactionSummary">{Object.entries(itemReactions).map(([emoji, info]) => <button aria-label={l(`${info.count} reacții ${emoji}`, `${info.count} ${emoji} reactions`, `${info.count} réactions ${emoji}`, `${info.count} reacciones ${emoji}`)} className={info.mine ? "mine" : ""} key={emoji} onClick={() => reactToMessage(item.id, emoji)}>{emoji} {info.count}</button>)}</div>}
           </div></Fragment>; })}<div ref={bottom} />
         </div>
         <div>{error && <p className="chatError" role="alert">{error}</p>}<form className="composer" onSubmit={send} aria-label={l("Scrie un mesaj", "Write a message")}>
@@ -1277,9 +1318,9 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
 	          <input ref={messageInput} aria-label={l("Mesaj", "Message")} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={t("messagePlaceholder")} maxLength={4000} disabled={sending} autoComplete="off" />
 	          <button className="primary sendBtn iconTextBtn" disabled={sending || (!draft.trim() && !attachment)}><Icon name="send" size={17}/><span>{sending ? t("sending") : t("send")}</span></button>
 	          {mentionMatch && <div className="mentionPicker" role="listbox" aria-label={t("mentionHint")}>
-	            {mentionSuggestions.length ? mentionSuggestions.map((member) => <button type="button" key={member.user_id} onClick={() => insertMention(member)}><span className="mentionAvatar">{(member.display_name || member.email).slice(0, 2).toUpperCase()}</span><span><strong>{member.display_name || member.email.split("@")[0]}</strong><small>{member.email}</small></span></button>) : <p>{language === "en" ? "No matching member" : "Niciun membru găsit"}</p>}
+	            {mentionSuggestions.length ? mentionSuggestions.map((member) => <button type="button" key={member.user_id} onClick={() => insertMention(member)}><span className="mentionAvatar">{(member.display_name || member.email).slice(0, 2).toUpperCase()}</span><span><strong>{member.display_name || member.email.split("@")[0]}</strong><small>{member.email}</small></span></button>) : <p>{l("Niciun membru găsit", "No matching member", "Aucun membre trouvé", "No se encontró ningún miembro")}</p>}
 	          </div>}
-          {emojiOpen && <div className="emojiPicker" role="dialog" aria-label={l("Selector de emoticoane", "Emoji picker")}><div className="emojiTabs" role="tablist">{emojiTabs.map((category) => <button role="tab" aria-selected={emojiCategory===category.id} className={emojiCategory===category.id ? "active" : ""} type="button" key={category.id} onClick={() => setEmojiCategory(category.id)} title={l(category.ro,category.en)}>{category.icon}<span>{l(category.ro,category.en)}</span></button>)}</div><div className="emojiGrid">{activeEmojiItems.map((emoji) => <button aria-label={l(`Adaugă ${emoji}`, `Add ${emoji}`)} type="button" key={emoji} onClick={() => insertEmoji(emoji)}>{emoji}</button>)}</div></div>}
+          {emojiOpen && <div className="emojiPicker" role="dialog" aria-label={l("Selector de emoticoane", "Emoji picker")}><div className="emojiTabs" role="tablist">{emojiTabs.map((category) => <button role="tab" aria-selected={emojiCategory===category.id} className={emojiCategory===category.id ? "active" : ""} type="button" key={category.id} onClick={() => setEmojiCategory(category.id)} title={l(category.ro,category.en,category.fr,category.es)}>{category.icon}<span>{l(category.ro,category.en,category.fr,category.es)}</span></button>)}</div><div className="emojiGrid">{activeEmojiItems.map((emoji) => <button aria-label={l(`Adaugă ${emoji}`, `Add ${emoji}`, `Ajouter ${emoji}`, `Añadir ${emoji}`)} type="button" key={emoji} onClick={() => insertEmoji(emoji)}>{emoji}</button>)}</div></div>}
           {attachment && <div className="selectedFile"><span>{attachment.name}</span><button type="button" aria-label={l("Elimină atașamentul", "Remove attachment")} onClick={() => { setAttachment(null); if (fileInput.current) fileInput.current.value = ""; }}>×</button></div>}
         </form></div></> :
 	        <><div className="mobileWelcomeBar"><button className="mobileMenuBtn iconTextBtn" onClick={() => setMobileMenuOpen(true)} aria-controls="group-menu" aria-expanded={mobileMenuOpen}><Icon name="menu"/><span>{t("myConversations")}</span></button></div><div className="welcome conversationHome"><div className="logo">eC</div><h2>{selectedCommunity?.name || t("yourConversations")}</h2><p>{visibleRooms.length ? t("chooseConversation") : t("noConversations")}</p>
@@ -1306,7 +1347,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
         </div>
         <p className="helper">
           {mutedUntil && new Date(mutedUntil) > new Date()
-            ? l(`Notificări oprite până la ${new Date(mutedUntil).toLocaleString("ro-RO")}`, `Notifications muted until ${new Date(mutedUntil).toLocaleString("en-GB")}`)
+            ? l(`Notificări oprite până la ${new Date(mutedUntil).toLocaleString("ro-RO")}`, `Notifications muted until ${new Date(mutedUntil).toLocaleString("en-GB")}`, `Notifications suspendues jusqu’au ${new Date(mutedUntil).toLocaleString("fr-FR")}`, `Notificaciones silenciadas hasta ${new Date(mutedUntil).toLocaleString("es-ES")}`)
             : l("Notificările nu sunt suspendate temporar.", "Notifications are not temporarily muted.")}
         </p>
         <button type="button" onClick={togglePushNotifications} disabled={notificationBusy}>
@@ -1348,10 +1389,10 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
         <label>{l("Adresele de email ale persoanelor", "People's email addresses")}<textarea rows={2} placeholder={l("nume@exemplu.ro, alt.nume@exemplu.ro", "name@example.com, another@example.com")} value={communityMemberEmails} onChange={(e) => setCommunityMemberEmails(e.target.value)} /></label>
         {selectedCommunityRooms.length > 0 && <fieldset className="inviteGroups inviteScope"><legend>{l("Unde sunt adăugate persoanele", "Where people are added")}</legend>
           <label className="checkLabel"><input type="radio" name="communityInviteScope" value="community" checked={communityInviteScope === "community"} onChange={() => { setCommunityInviteScope("community"); setCommunityInviteGroups([]); }} />{l("Numai în comunitate", "Community only")}</label>
-          <label className="checkLabel"><input type="radio" name="communityInviteScope" value="all" checked={communityInviteScope === "all"} disabled={!bulkEligibleCommunityRooms.length} onChange={() => { setCommunityInviteScope("all"); setCommunityInviteGroups(bulkEligibleCommunityRooms.map((item) => item.id)); }} />{l(`În toate grupurile existente fără parolă (${bulkEligibleCommunityRooms.length})`, `All existing groups without a password (${bulkEligibleCommunityRooms.length})`)}</label>
+          <label className="checkLabel"><input type="radio" name="communityInviteScope" value="all" checked={communityInviteScope === "all"} disabled={!bulkEligibleCommunityRooms.length} onChange={() => { setCommunityInviteScope("all"); setCommunityInviteGroups(bulkEligibleCommunityRooms.map((item) => item.id)); }} />{l(`În toate grupurile existente fără parolă (${bulkEligibleCommunityRooms.length})`, `All existing groups without a password (${bulkEligibleCommunityRooms.length})`, `Tous les groupes existants sans mot de passe (${bulkEligibleCommunityRooms.length})`, `Todos los grupos existentes sin contraseña (${bulkEligibleCommunityRooms.length})`)}</label>
           <label className="checkLabel"><input type="radio" name="communityInviteScope" value="selected" checked={communityInviteScope === "selected"} disabled={!bulkEligibleCommunityRooms.length} onChange={() => setCommunityInviteScope("selected")} />{l("În grupurile selectate", "Selected groups")}</label>
           {communityInviteScope === "selected" && <div className="groupChoiceList">{bulkEligibleCommunityRooms.map((item) => <label className="checkLabel" key={item.id}><input type="checkbox" checked={communityInviteGroups.includes(item.id)} onChange={(e) => setCommunityInviteGroups((current) => e.target.checked ? [...current,item.id] : current.filter((id) => id !== item.id))} />{item.title}</label>)}</div>}
-          {protectedCommunityRooms.length > 0 && <p className="protectedGroupNote"><span aria-hidden="true">🔒</span>{l(`${protectedCommunityRooms.length} grupuri cu parolă sunt excluse. Membrii se adaugă separat din setările fiecărui grup.`, `${protectedCommunityRooms.length} password-protected groups are excluded. Add members separately from each group's settings.`)}</p>}
+          {protectedCommunityRooms.length > 0 && <p className="protectedGroupNote"><span aria-hidden="true">🔒</span>{l(`${protectedCommunityRooms.length} grupuri cu parolă sunt excluse. Membrii se adaugă separat din setările fiecărui grup.`, `${protectedCommunityRooms.length} password-protected groups are excluded. Add members separately from each group's settings.`, `${protectedCommunityRooms.length} groupes protégés par mot de passe sont exclus. Ajoutez les membres séparément dans les paramètres de chaque groupe.`, `${protectedCommunityRooms.length} grupos protegidos con contraseña están excluidos. Añade los miembros por separado desde los ajustes de cada grupo.`)}</p>}
         </fieldset>}
         <p className="helper">{l("Conturile existente sunt adăugate imediat. Pentru celelalte adrese vei primi câte un link valabil 7 zile.", "Existing accounts are added immediately. For other addresses, you will receive a link valid for 7 days.")}</p>
         <button className="primary" disabled={communityBusy || !communityMemberEmails.trim()}>{l("Adaugă sau creează invitații", "Add or create invitations")}</button>
@@ -1374,7 +1415,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
       <form className="form" onSubmit={saveProfile}>
         <label>{t("displayName")}<input required minLength={2} maxLength={80} value={profileName} onChange={(e) => setProfileName(e.target.value)} /></label>
         <label>{t("email")}<input value={session.user.email || ""} disabled /></label>
-        <label>{t("language")}<select value={language} onChange={(e) => setLanguage(e.target.value)}><option value="ro">Română</option><option value="en">English</option></select></label>
+        <label>{t("language")}<select value={language} onChange={(e) => setLanguage(e.target.value)}><option value="ro">Română</option><option value="en">English</option><option value="fr">Français</option><option value="es">Español</option></select></label>
         <label>{l("Tema interfeței", "Interface theme")}<select value={themePreference} onChange={(e) => setThemePreference(e.target.value)}>
           <option value="auto">{l("Automat — urmează dispozitivul", "Automatic — follow device")}</option>
           <option value="light">{l("Luminoasă", "Light")}</option>
@@ -1394,7 +1435,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
       </form>
     </section></div>}
     {logoutWarning && <div className="modalBackdrop"><section className="modal timeoutModal" role="alertdialog" aria-modal="true" aria-labelledby="timeout-dialog-title">
-      <p className="eyebrow">{l("Sesiune inactivă", "Inactive session")}</p><h2 id="timeout-dialog-title" aria-live="polite">{l(`Vei fi delogat în ${logoutCountdown} secunde`, `You will be signed out in ${logoutCountdown} seconds`)}</h2>
+      <p className="eyebrow">{l("Sesiune inactivă", "Inactive session")}</p><h2 id="timeout-dialog-title" aria-live="polite">{l(`Vei fi delogat în ${logoutCountdown} secunde`, `You will be signed out in ${logoutCountdown} seconds`, `Vous serez déconnecté dans ${logoutCountdown} secondes`, `La sesión se cerrará en ${logoutCountdown} segundos`)}</h2>
       <p className="muted">{l("Pentru protejarea contului, sesiunea se închide automat după 15 minute fără activitate.", "To protect your account, the session closes automatically after 15 minutes of inactivity.")}</p>
       <div className="modalActions"><button onClick={signOut}>{l("Ieșire acum", "Sign out now")}</button><button className="primary" onClick={() => window.dispatchEvent(new Event("pointerdown"))}>{l("Rămân conectat", "Stay signed in")}</button></div>
     </section></div>}
@@ -1409,7 +1450,7 @@ export default function Home() {
   const [language, setLanguageState] = useState("ro");
   const [themePreference, setThemePreferenceState] = useState("auto");
   function setLanguage(nextLanguage) {
-    const safeLanguage = nextLanguage === "en" ? "en" : "ro";
+    const safeLanguage = SUPPORTED_LANGUAGES.includes(nextLanguage) ? nextLanguage : "ro";
     setLanguageState(safeLanguage);
     if (typeof window !== "undefined") window.localStorage.setItem("eclintalk-language", safeLanguage);
     if (typeof document !== "undefined") document.documentElement.lang = safeLanguage;
@@ -1430,7 +1471,8 @@ export default function Home() {
   }
   useEffect(() => {
     const storedLanguage = window.localStorage.getItem("eclintalk-language");
-    setLanguage(storedLanguage || (navigator.language?.toLowerCase().startsWith("en") ? "en" : "ro"));
+    const browserLanguage = navigator.language?.slice(0, 2).toLowerCase();
+    setLanguage(storedLanguage || (SUPPORTED_LANGUAGES.includes(browserLanguage) ? browserLanguage : "ro"));
     setThemePreference(window.localStorage.getItem("eclintalk-theme") || "auto");
     const query = new URLSearchParams(window.location.search);
     setInviteToken(query.get("invite") || "");
@@ -1459,7 +1501,7 @@ export default function Home() {
     media.addEventListener?.("change", syncAutomaticTheme);
     return () => media.removeEventListener?.("change", syncAutomaticTheme);
   }, [themePreference]);
-  if (checking) return <main className="center">{language === "en" ? "Checking session..." : "Se verifică sesiunea..."}</main>;
+  if (checking) return <main className="center">{localize(language, "Se verifică sesiunea...", "Checking session...", "Vérification de la session…", "Comprobando la sesión…")}</main>;
   if (passwordRecovery && session) return <UpdatePassword language={language} completed={() => {
     window.history.replaceState({}, "", "/");
     setPasswordRecovery(false);
