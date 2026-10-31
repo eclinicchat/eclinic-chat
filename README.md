@@ -1,4 +1,8 @@
-# eClinTalk v1.17.2
+# eClinTalk v1.17.3
+
+Versiunea v1.17.3 corecteaza meniul lateral in ecranul initial si in conversatii. Lista grupurilor poate fi derulata independent, iar zona de profil si butonul **Iesire / Sign out** raman accesibile la baza ecranului pe Mac, Windows, iPhone/iPad si Android, inclusiv pe ecrane cu inaltime redusa. Actualizarea nu necesita niciun script SQL nou.
+
+## Versiunea v1.17.2
 
 Versiunea v1.17.2 corecteaza pastrarea limbii selectate la autentificare: aceasta nu mai este suprascrisa dupa conectare de o preferinta mai veche din profil. Interfata si mesajele raman in limba aleasa pe dispozitiv.
 
