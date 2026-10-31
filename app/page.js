@@ -373,6 +373,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   const [communityInviteScope, setCommunityInviteScope] = useState("community");
   const [communityInviteGroups, setCommunityInviteGroups] = useState([]);
   const [communityInviteLinks, setCommunityInviteLinks] = useState([]);
+  const [invitationLanguage, setInvitationLanguage] = useState(language);
   const [memberGroupEditorId, setMemberGroupEditorId] = useState(null);
   const [memberGroupOptions, setMemberGroupOptions] = useState([]);
   const [memberGroupSelection, setMemberGroupSelection] = useState([]);
@@ -484,7 +485,6 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
       .select("display_name, preferred_language").eq("user_id", session.user.id).maybeSingle();
     if (profileLoadError) setProfileError(profileLoadError.message);
     setProfileName(data?.display_name || session.user.email?.split("@")[0] || "");
-    if (data?.preferred_language) setLanguage(data.preferred_language);
     setProfileOpen(true);
   }
 
@@ -618,7 +618,6 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     supabase.from("profiles").select("display_name, preferred_language").eq("user_id", session.user.id).maybeSingle()
       .then(({ data }) => {
         if (data?.display_name) setProfileName(data.display_name);
-        if (data?.preferred_language) setLanguage(data.preferred_language);
       });
   }, []);
   useEffect(() => {
@@ -1039,7 +1038,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
 
   function invitationShareText(link) {
     const community = selectedCommunity?.name || "eClinTalk";
-    return l(
+    return localize(invitationLanguage,
       `Ai fost invitat(ă) în comunitatea „${community}” din eClinTalk. Deschide linkul pentru a-ți crea contul sau pentru a accepta invitația. Linkul este valabil 7 zile:\n${link.url}`,
       `You have been invited to the “${community}” community in eClinTalk. Open the link to create your account or accept the invitation. The link is valid for 7 days:\n${link.url}`,
       `Vous avez été invité(e) dans la communauté « ${community} » sur eClinTalk. Ouvrez le lien pour créer votre compte ou accepter l’invitation. Le lien est valable 7 jours :\n${link.url}`,
@@ -1049,7 +1048,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
 
   function invitationEmailText(link) {
     const community = selectedCommunity?.name || "eClinTalk";
-    return l(
+    return localize(invitationLanguage,
       `Bună,\n\nAi fost invitat(ă) în comunitatea „${community}” din eClinTalk.\n\neClinTalk este o aplicație privată de comunicare pentru echipe și comunități. Poți participa la comunitățile și grupurile în care primești acces, poți trimite mesaje și imagini, răspunde la mesaje, folosi mențiuni și emoticoane și poți configura separat notificările fiecărui grup. Accesul la comunități și grupuri este controlat de administratorii lor.\n\nAplicația funcționează pe Mac, Windows, iPhone/iPad și Android. Pe telefon poate fi instalată pe ecranul principal și apoi se deschide din pictograma eClinTalk, asemenea unei aplicații obișnuite:\n• iPhone/iPad: deschide linkul în Safari, apasă Partajare, apoi „Adaugă la ecranul principal”.\n• Android: deschide linkul în Chrome, deschide meniul și alege „Instalează aplicația” sau „Adaugă la ecranul principal”.\n• Mac: folosește Safari sau Chrome și opțiunea „Adaugă în Dock” / „Instalează aplicația”.\n• Windows: folosește Edge sau Chrome și opțiunea „Instalează aplicația”.\n\nDeschide linkul de mai jos pentru a-ți crea contul sau pentru a accepta invitația. Linkul este valabil 7 zile:\n${link.url}\n\nImportant: eClinTalk este încă o versiune de test. Nu introduce date medicale sau personale reale despre pacienți.\n\nDupă instalare, deschide aplicația din pictograma eClinTalk și activează notificările dacă dorești să fii anunțat(ă) când primești mesaje noi.\n\nCreat de eClinic Hub`,
       `Hello,\n\nYou have been invited to the “${community}” community in eClinTalk.\n\neClinTalk is a private communication app for teams and communities. You can participate in the communities and groups you are given access to, send messages and images, reply to messages, use mentions and emoji, and configure notifications separately for each group. Access to communities and groups is controlled by their administrators.\n\nThe app works on Mac, Windows, iPhone/iPad, and Android. On a phone, it can be installed on the Home Screen and then opened from the eClinTalk icon just like a regular app:\n• iPhone/iPad: open the link in Safari, tap Share, then “Add to Home Screen”.\n• Android: open the link in Chrome, open the menu, and choose “Install app” or “Add to Home screen”.\n• Mac: use Safari or Chrome and choose “Add to Dock” / “Install app”.\n• Windows: use Edge or Chrome and choose “Install app”.\n\nOpen the link below to create your account or accept the invitation. The link is valid for 7 days:\n${link.url}\n\nImportant: eClinTalk is still a test version. Do not enter real patient medical or personal data.\n\nAfter installation, open the app from the eClinTalk icon and enable notifications if you want to be notified about new messages.\n\nCreated by eClinic Hub`,
       `Bonjour,\n\nVous avez été invité(e) dans la communauté « ${community} » sur eClinTalk.\n\neClinTalk est une application privée de communication pour les équipes et les communautés. Vous pouvez participer aux communautés et groupes auxquels vous avez accès, envoyer des messages et des images, répondre aux messages, utiliser des mentions et des emoji, et configurer séparément les notifications de chaque groupe. L’accès aux communautés et aux groupes est contrôlé par leurs administrateurs.\n\nL’application fonctionne sur Mac, Windows, iPhone/iPad et Android. Sur un téléphone, elle peut être installée sur l’écran d’accueil, puis ouverte depuis l’icône eClinTalk comme une application classique :\n• iPhone/iPad : ouvrez le lien dans Safari, touchez Partager, puis « Sur l’écran d’accueil ».\n• Android : ouvrez le lien dans Chrome, ouvrez le menu, puis choisissez « Installer l’application » ou « Ajouter à l’écran d’accueil ».\n• Mac : utilisez Safari ou Chrome et choisissez « Ajouter au Dock » / « Installer l’application ».\n• Windows : utilisez Edge ou Chrome et choisissez « Installer l’application ».\n\nOuvrez le lien ci-dessous pour créer votre compte ou accepter l’invitation. Le lien est valable 7 jours :\n${link.url}\n\nImportant : eClinTalk est encore une version de test. Ne saisissez aucune donnée médicale ou personnelle réelle concernant des patients.\n\nAprès l’installation, ouvrez l’application depuis l’icône eClinTalk et activez les notifications si vous souhaitez être averti(e) des nouveaux messages.\n\nCréé par eClinic Hub`,
@@ -1063,7 +1062,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
 
   function shareInvitationByEmail(link) {
     const community = selectedCommunity?.name || "eClinTalk";
-    const subject = l(
+    const subject = localize(invitationLanguage,
       `Invitație eClinTalk – ${community}`,
       `eClinTalk invitation – ${community}`,
       `Invitation eClinTalk – ${community}`,
@@ -1487,7 +1486,8 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
         <p className="helper">{l("Conturile existente sunt adăugate imediat. Pentru celelalte adrese se creează un link valabil 7 zile, pe care îl poți trimite prin WhatsApp sau e-mail.", "Existing accounts are added immediately. For other addresses, a link valid for 7 days is created and can be sent by WhatsApp or email.", "Les comptes existants sont ajoutés immédiatement. Pour les autres adresses, un lien valable 7 jours est créé et peut être envoyé par WhatsApp ou e-mail.", "Las cuentas existentes se añaden inmediatamente. Para las demás direcciones se crea un enlace válido durante 7 días que puedes enviar por WhatsApp o correo electrónico.")}</p>
         <button className="primary" disabled={communityBusy || !communityMemberEmails.trim()}>{l("Adaugă / creează invitațiile", "Add / create invitations", "Ajouter / créer les invitations", "Añadir / crear invitaciones")}</button>
       </form>
-      {communityInviteLinks.length>0 && <div className="manageSection invitationResults"><div className="sectionHeading"><strong>{l("Linkuri de trimis", "Links to share")}</strong><small>{communityInviteLinks.length}</small></div>
+      {communityInviteLinks.length>0 && <div className="manageSection invitationResults"><div className="sectionHeading"><strong>{l("Linkuri de trimis", "Links to share", "Liens à partager", "Enlaces para compartir")}</strong><small>{communityInviteLinks.length}</small></div>
+        <label className="invitationLanguageLabel">{l("Limba invitației", "Invitation language", "Langue de l’invitation", "Idioma de la invitación")}<select value={invitationLanguage} onChange={(e) => setInvitationLanguage(e.target.value)}><option value="ro">Română</option><option value="en">English</option><option value="fr">Français</option><option value="es">Español</option></select></label>
         {communityInviteLinks.map((link) => <div className="invitationRow" key={link.email}><div><strong>{link.email}</strong><input readOnly value={link.url} onFocus={(e) => e.target.select()} /></div><div className="invitationActions"><button type="button" className="whatsappBtn" onClick={() => shareInvitationOnWhatsApp(link)}><span aria-hidden="true">◉</span>{l("WhatsApp", "WhatsApp")}</button><button type="button" onClick={() => shareInvitationByEmail(link)}><span aria-hidden="true">✉</span>{l("E-mail", "Email")}</button><button type="button" onClick={() => copyInvitation(link)}>{l("Copiază", "Copy")}</button></div></div>)}
       </div>}
       <div className="manageSection"><div className="sectionHeading"><strong>{l("Membrii comunității", "Community members")}</strong><small>{communityMembers.length}</small></div>

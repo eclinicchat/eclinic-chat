@@ -1,4 +1,10 @@
-# eClinTalk v1.17.1
+# eClinTalk v1.17.2
+
+Versiunea v1.17.2 corecteaza pastrarea limbii selectate la autentificare: aceasta nu mai este suprascrisa dupa conectare de o preferinta mai veche din profil. Interfata si mesajele raman in limba aleasa pe dispozitiv.
+
+Pentru fiecare set de linkuri nou creat apare acum selectorul **Limba invitatiei**, independent de limba interfetei. Administratorul poate trimite mesajul explicativ prin e-mail sau invitatia scurta prin WhatsApp in romana, engleza, franceza ori spaniola. Actualizarea nu necesita niciun script SQL nou.
+
+## Versiunea v1.17.1
 
 Versiunea v1.17.1 imbunatateste invitatia trimisa prin e-mail. Mesajul precompletat explica scopul eClinTalk, functiile principale, compatibilitatea cu Mac, Windows, iPhone/iPad si Android si pasii prin care aplicatia se instaleaza pe telefon sau calculator si se deschide din pictograma proprie, asemenea unei aplicatii obisnuite. Mesajul este generat in limba selectata in interfata: romana, engleza, franceza sau spaniola. Include linkul de invitatie valabil 7 zile, instructiuni pentru notificari si avertismentul ca versiunea este destinata testarii fara date medicale sau personale reale despre pacienti.
 
