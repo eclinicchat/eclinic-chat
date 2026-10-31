@@ -111,3 +111,7 @@ header{min-height:72px;padding:13px 22px;background:#0a1623cc;backdrop-filter:bl
 :root[data-theme="light"] .communityNav>button.selected,:root[data-theme="light"] .conv.active{background:#cbdff2;box-shadow:inset 4px 0 #125cae}
 :root[data-theme="light"] .manageCommunityBtn,:root[data-theme="light"] .headerActions button,:root[data-theme="light"] .roomSearch input{border-color:#70849c}
 @media(prefers-contrast:more){:root{--line:#91a6bf;--muted:#d0dae6}:root[data-theme="light"]{--line:#526981;--muted:#263b53}.communityNav>button.selected,.conv.active{box-shadow:inset 5px 0 #8bc2ff,0 0 0 1px var(--line)}button,input,textarea,select,.bubble,.modal{border-width:2px}}
+
+/* v1.16.1 — distribuirea invitatiilor */
+.invitationRow{grid-template-columns:minmax(0,1fr) auto}.invitationActions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.invitationActions button{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}.invitationActions .whatsappBtn{background:#146c43;border-color:#2ba66d;color:#fff}.invitationActions .whatsappBtn:hover:not(:disabled){background:#197d50}:root[data-theme="light"] .invitationActions .whatsappBtn{background:#157347;border-color:#157347;color:#fff}
+@media(max-width:760px){.invitationRow{grid-template-columns:1fr}.invitationActions{display:grid;grid-template-columns:1fr 1fr}.invitationActions button{width:100%}.invitationActions button:last-child{grid-column:1/-1}}

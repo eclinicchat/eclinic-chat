@@ -1,4 +1,6 @@
-# eClinTalk v1.16.0
+# eClinTalk v1.16.1
+
+Versiunea v1.16.1 clarifica fluxul de adaugare si invitare a membrilor. Pentru persoanele fara cont, linkul de invitatie poate fi trimis direct prin WhatsApp, deschis intr-un mesaj e-mail precompletat sau copiat. Trimiterea prin WhatsApp si e-mail este confirmata de utilizator in aplicatia de mesagerie aleasa; aplicatia eClinTalk nu trimite mesaje automat in numele utilizatorului.
 
 Versiunea v1.16.0 permite administratorului general sa administreze membrii oricarei comunitati, inclusiv „Birou”, imbunatateste contrastul in temele luminoasa si intunecata si adauga interfata in franceza si spaniola, alaturi de romana si engleza. Limba este detectata automat la prima deschidere si poate fi schimbata din ecranul de conectare sau din profil.
 

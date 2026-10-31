@@ -986,6 +986,31 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     }
   }
 
+  function invitationShareText(link) {
+    const community = selectedCommunity?.name || "eClinTalk";
+    return l(
+      `Ai fost invitat(ă) în comunitatea „${community}” din eClinTalk. Deschide linkul pentru a-ți crea contul sau pentru a accepta invitația. Linkul este valabil 7 zile:\n${link.url}`,
+      `You have been invited to the “${community}” community in eClinTalk. Open the link to create your account or accept the invitation. The link is valid for 7 days:\n${link.url}`,
+      `Vous avez été invité(e) dans la communauté « ${community} » sur eClinTalk. Ouvrez le lien pour créer votre compte ou accepter l’invitation. Le lien est valable 7 jours :\n${link.url}`,
+      `Has recibido una invitación a la comunidad «${community}» en eClinTalk. Abre el enlace para crear tu cuenta o aceptar la invitación. El enlace es válido durante 7 días:\n${link.url}`,
+    );
+  }
+
+  function shareInvitationOnWhatsApp(link) {
+    window.open(`https://wa.me/?text=${encodeURIComponent(invitationShareText(link))}`, "_blank", "noopener,noreferrer");
+  }
+
+  function shareInvitationByEmail(link) {
+    const community = selectedCommunity?.name || "eClinTalk";
+    const subject = l(
+      `Invitație eClinTalk – ${community}`,
+      `eClinTalk invitation – ${community}`,
+      `Invitation eClinTalk – ${community}`,
+      `Invitación eClinTalk – ${community}`,
+    );
+    window.location.href = `mailto:${encodeURIComponent(link.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(invitationShareText(link))}`;
+  }
+
   async function toggleCommunityAdmin(member) {
     if (!selectedCommunity || communityBusy || !window.confirm(member.is_admin ? l(`Retragi rolul de administrator pentru ${member.email}?`, `Remove administrator access from ${member.email}?`, `Retirer le rôle d’administrateur à ${member.email} ?`, `¿Quitar el rol de administrador a ${member.email}?`) : l(`Acordezi rolul de administrator lui ${member.email}?`, `Grant administrator access to ${member.email}?`, `Accorder le rôle d’administrateur à ${member.email} ?`, `¿Conceder el rol de administrador a ${member.email}?`))) return;
     setCommunityBusy(true); setCommunityError(""); setCommunityNotice("");
@@ -1385,7 +1410,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
         <button className="primary" disabled={communityBusy || !communityName.trim()}>{t("save")}</button>
       </form>
       <form className="manageSection" onSubmit={addCommunityMembers}>
-        <div className="sectionHeading"><strong>{l("Adaugă sau invită", "Add or invite")}</strong><small>{l("după email", "by email")}</small></div>
+        <div className="sectionHeading"><strong>{l("Adaugă membri sau creează invitații", "Add members or create invitations", "Ajouter des membres ou créer des invitations", "Añadir miembros o crear invitaciones")}</strong><small>{l("după email", "by email")}</small></div>
         <label>{l("Adresele de email ale persoanelor", "People's email addresses")}<textarea rows={2} placeholder={l("nume@exemplu.ro, alt.nume@exemplu.ro", "name@example.com, another@example.com")} value={communityMemberEmails} onChange={(e) => setCommunityMemberEmails(e.target.value)} /></label>
         {selectedCommunityRooms.length > 0 && <fieldset className="inviteGroups inviteScope"><legend>{l("Unde sunt adăugate persoanele", "Where people are added")}</legend>
           <label className="checkLabel"><input type="radio" name="communityInviteScope" value="community" checked={communityInviteScope === "community"} onChange={() => { setCommunityInviteScope("community"); setCommunityInviteGroups([]); }} />{l("Numai în comunitate", "Community only")}</label>
@@ -1394,11 +1419,11 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
           {communityInviteScope === "selected" && <div className="groupChoiceList">{bulkEligibleCommunityRooms.map((item) => <label className="checkLabel" key={item.id}><input type="checkbox" checked={communityInviteGroups.includes(item.id)} onChange={(e) => setCommunityInviteGroups((current) => e.target.checked ? [...current,item.id] : current.filter((id) => id !== item.id))} />{item.title}</label>)}</div>}
           {protectedCommunityRooms.length > 0 && <p className="protectedGroupNote"><span aria-hidden="true">🔒</span>{l(`${protectedCommunityRooms.length} grupuri cu parolă sunt excluse. Membrii se adaugă separat din setările fiecărui grup.`, `${protectedCommunityRooms.length} password-protected groups are excluded. Add members separately from each group's settings.`, `${protectedCommunityRooms.length} groupes protégés par mot de passe sont exclus. Ajoutez les membres séparément dans les paramètres de chaque groupe.`, `${protectedCommunityRooms.length} grupos protegidos con contraseña están excluidos. Añade los miembros por separado desde los ajustes de cada grupo.`)}</p>}
         </fieldset>}
-        <p className="helper">{l("Conturile existente sunt adăugate imediat. Pentru celelalte adrese vei primi câte un link valabil 7 zile.", "Existing accounts are added immediately. For other addresses, you will receive a link valid for 7 days.")}</p>
-        <button className="primary" disabled={communityBusy || !communityMemberEmails.trim()}>{l("Adaugă sau creează invitații", "Add or create invitations")}</button>
+        <p className="helper">{l("Conturile existente sunt adăugate imediat. Pentru celelalte adrese se creează un link valabil 7 zile, pe care îl poți trimite prin WhatsApp sau e-mail.", "Existing accounts are added immediately. For other addresses, a link valid for 7 days is created and can be sent by WhatsApp or email.", "Les comptes existants sont ajoutés immédiatement. Pour les autres adresses, un lien valable 7 jours est créé et peut être envoyé par WhatsApp ou e-mail.", "Las cuentas existentes se añaden inmediatamente. Para las demás direcciones se crea un enlace válido durante 7 días que puedes enviar por WhatsApp o correo electrónico.")}</p>
+        <button className="primary" disabled={communityBusy || !communityMemberEmails.trim()}>{l("Adaugă / creează invitațiile", "Add / create invitations", "Ajouter / créer les invitations", "Añadir / crear invitaciones")}</button>
       </form>
       {communityInviteLinks.length>0 && <div className="manageSection invitationResults"><div className="sectionHeading"><strong>{l("Linkuri de trimis", "Links to share")}</strong><small>{communityInviteLinks.length}</small></div>
-        {communityInviteLinks.map((link) => <div className="invitationRow" key={link.email}><div><strong>{link.email}</strong><input readOnly value={link.url} onFocus={(e) => e.target.select()} /></div><button onClick={() => copyInvitation(link)}>{l("Copiază", "Copy")}</button></div>)}
+        {communityInviteLinks.map((link) => <div className="invitationRow" key={link.email}><div><strong>{link.email}</strong><input readOnly value={link.url} onFocus={(e) => e.target.select()} /></div><div className="invitationActions"><button type="button" className="whatsappBtn" onClick={() => shareInvitationOnWhatsApp(link)}><span aria-hidden="true">◉</span>{l("WhatsApp", "WhatsApp")}</button><button type="button" onClick={() => shareInvitationByEmail(link)}><span aria-hidden="true">✉</span>{l("E-mail", "Email")}</button><button type="button" onClick={() => copyInvitation(link)}>{l("Copiază", "Copy")}</button></div></div>)}
       </div>}
       <div className="manageSection"><div className="sectionHeading"><strong>{l("Membrii comunității", "Community members")}</strong><small>{communityMembers.length}</small></div>
         <div className="memberList">{communityMembers.map((member) => <div className="memberRow" key={member.user_id}><div><strong>{member.display_name || member.email}</strong><small>{member.email} · {member.is_admin ? l("Administrator de comunitate", "Community administrator") : l("Membru", "Member")}</small></div>
