@@ -1,4 +1,8 @@
-# eClinTalk v1.16.1
+# eClinTalk v1.17.0
+
+Versiunea v1.17.0 permite administratorului comunitatii sa stabileasca ulterior, prin bife, clinicile/grupurile vizibile pentru fiecare membru. Un administrator al comunitatii nu vede grupurile protejate cu parola daca nu a fost invitat in ele. Accesul la aceste grupuri poate fi acordat numai de administratorul grupului sau de administratorul general. Accesul de proprietar sau administrator al unui grup nu poate fi retras accidental din acest ecran. Fereastra de administrare poate fi derulata complet pe iPhone si Android, inclusiv cand lista membrilor sau a clinicilor este lunga.
+
+Inainte de publicarea acestei versiuni, ruleaza integral o singura data `supabase-community-group-access-v1.17.sql` in Supabase SQL Editor.
 
 Versiunea v1.16.1 clarifica fluxul de adaugare si invitare a membrilor. Pentru persoanele fara cont, linkul de invitatie poate fi trimis direct prin WhatsApp, deschis intr-un mesaj e-mail precompletat sau copiat. Trimiterea prin WhatsApp si e-mail este confirmata de utilizator in aplicatia de mesagerie aleasa; aplicatia eClinTalk nu trimite mesaje automat in numele utilizatorului.
 

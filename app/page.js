@@ -373,6 +373,9 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   const [communityInviteScope, setCommunityInviteScope] = useState("community");
   const [communityInviteGroups, setCommunityInviteGroups] = useState([]);
   const [communityInviteLinks, setCommunityInviteLinks] = useState([]);
+  const [memberGroupEditorId, setMemberGroupEditorId] = useState(null);
+  const [memberGroupOptions, setMemberGroupOptions] = useState([]);
+  const [memberGroupSelection, setMemberGroupSelection] = useState([]);
   const [inviteStatus, setInviteStatus] = useState("");
   const [roomId, setRoomId] = useState(null);
   const [unlockedRoomId, setUnlockedRoomId] = useState(null);
@@ -920,8 +923,56 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     setCommunityDescription(selectedCommunity.description || "");
     setCommunityMemberEmails(""); setCommunityMembers([]); setCommunityError(""); setCommunityNotice("");
     setCommunityInviteScope("community"); setCommunityInviteGroups([]); setCommunityInviteLinks([]);
+    setMemberGroupEditorId(null); setMemberGroupOptions([]); setMemberGroupSelection([]);
     setCommunitySettingsOpen(true);
     await loadCommunityMembers();
+  }
+
+  async function openMemberGroupEditor(member) {
+    if (!selectedCommunity || communityBusy) return;
+    if (memberGroupEditorId === member.user_id) {
+      setMemberGroupEditorId(null); setMemberGroupOptions([]); setMemberGroupSelection([]);
+      return;
+    }
+    setCommunityBusy(true); setCommunityError(""); setCommunityNotice("");
+    const { data, error: accessError } = await supabase.rpc("get_community_member_group_access", {
+      target_community_id: selectedCommunity.id,
+      target_user_id: member.user_id,
+    });
+    if (accessError) setCommunityError(accessError.message);
+    else {
+      const options = data || [];
+      setMemberGroupEditorId(member.user_id);
+      setMemberGroupOptions(options);
+      setMemberGroupSelection(options.filter((item) => item.is_member).map((item) => item.conversation_id));
+    }
+    setCommunityBusy(false);
+  }
+
+  async function saveMemberGroupAccess(member) {
+    if (!selectedCommunity || communityBusy || memberGroupEditorId !== member.user_id) return;
+    const allowedIds = memberGroupOptions.filter((item) => item.can_manage).map((item) => item.conversation_id);
+    const selectedIds = memberGroupSelection.filter((id) => allowedIds.includes(id));
+    setCommunityBusy(true); setCommunityError(""); setCommunityNotice("");
+    const { error: accessError } = await supabase.rpc("set_community_member_groups", {
+      target_community_id: selectedCommunity.id,
+      target_user_id: member.user_id,
+      target_conversation_ids: selectedIds,
+    });
+    if (accessError) setCommunityError(accessError.message);
+    else {
+      setMemberGroupOptions((current) => current.map((item) => ({
+        ...item,
+        is_member: item.is_admin || item.is_owner || selectedIds.includes(item.conversation_id),
+      })));
+      setCommunityNotice(l(
+        `Clinicile/grupurile vizibile pentru ${member.display_name || member.email} au fost actualizate.`,
+        `Visible clinics/groups for ${member.display_name || member.email} were updated.`,
+        `Les cliniques/groupes visibles pour ${member.display_name || member.email} ont été mis à jour.`,
+        `Se actualizaron las clínicas/grupos visibles para ${member.display_name || member.email}.`,
+      ));
+    }
+    setCommunityBusy(false);
   }
 
   async function saveCommunity(e) {
@@ -1028,7 +1079,11 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
       target_community_id: selectedCommunity.id,target_user_id: member.user_id,
     });
     if (removeError) setCommunityError(removeError.message);
-    else { await Promise.all([loadCommunityMembers(),loadCommunities(selectedCommunity.id),loadRooms()]); setCommunityNotice(l("Membrul a fost eliminat din comunitate.", "The member was removed from the community.")); }
+    else {
+      if (memberGroupEditorId === member.user_id) { setMemberGroupEditorId(null); setMemberGroupOptions([]); setMemberGroupSelection([]); }
+      await Promise.all([loadCommunityMembers(),loadCommunities(selectedCommunity.id),loadRooms()]);
+      setCommunityNotice(l("Membrul a fost eliminat din comunitate.", "The member was removed from the community."));
+    }
     setCommunityBusy(false);
   }
 
@@ -1426,10 +1481,17 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
         {communityInviteLinks.map((link) => <div className="invitationRow" key={link.email}><div><strong>{link.email}</strong><input readOnly value={link.url} onFocus={(e) => e.target.select()} /></div><div className="invitationActions"><button type="button" className="whatsappBtn" onClick={() => shareInvitationOnWhatsApp(link)}><span aria-hidden="true">◉</span>{l("WhatsApp", "WhatsApp")}</button><button type="button" onClick={() => shareInvitationByEmail(link)}><span aria-hidden="true">✉</span>{l("E-mail", "Email")}</button><button type="button" onClick={() => copyInvitation(link)}>{l("Copiază", "Copy")}</button></div></div>)}
       </div>}
       <div className="manageSection"><div className="sectionHeading"><strong>{l("Membrii comunității", "Community members")}</strong><small>{communityMembers.length}</small></div>
-        <div className="memberList">{communityMembers.map((member) => <div className="memberRow" key={member.user_id}><div><strong>{member.display_name || member.email}</strong><small>{member.email} · {member.is_admin ? l("Administrator de comunitate", "Community administrator") : l("Membru", "Member")}</small></div>
-          <div className="memberActions">{isGeneralAdmin && member.user_id !== session.user.id && <button disabled={communityBusy} onClick={() => toggleCommunityAdmin(member)}>{member.is_admin ? l("Retrage admin", "Remove admin") : l("Fă admin", "Make admin")}</button>}
+        <div className="memberList">{communityMembers.map((member) => <Fragment key={member.user_id}><div className="memberRow"><div><strong>{member.display_name || member.email}</strong><small>{member.email} · {member.is_admin ? l("Administrator de comunitate", "Community administrator") : l("Membru", "Member")}</small></div>
+          <div className="memberActions"><button disabled={communityBusy} onClick={() => openMemberGroupEditor(member)}><Icon name="settings" size={15}/>{l("Clinici / grupuri", "Clinics / groups", "Cliniques / groupes", "Clínicas / grupos")}</button>{isGeneralAdmin && member.user_id !== session.user.id && <button disabled={communityBusy} onClick={() => toggleCommunityAdmin(member)}>{member.is_admin ? l("Retrage admin", "Remove admin") : l("Fă admin", "Make admin")}</button>}
           {member.user_id !== session.user.id && (!member.is_admin || isGeneralAdmin) && <button disabled={communityBusy} onClick={() => removeCommunityMember(member)}>{l("Elimină", "Remove")}</button>}</div>
-        </div>)}</div>
+        </div>{memberGroupEditorId === member.user_id && <div className="memberGroupEditor"><div className="sectionHeading"><strong>{l("Clinici / grupuri vizibile", "Visible clinics / groups", "Cliniques / groupes visibles", "Clínicas / grupos visibles")}</strong><small>{memberGroupSelection.length}</small></div>
+          {memberGroupOptions.length ? <div className="memberGroupChoices">{memberGroupOptions.map((item) => {
+            const fixedAccess = item.is_admin || item.is_owner;
+            return <label className={`checkLabel ${item.password_protected ? "protectedChoice" : ""}`} key={item.conversation_id}><input type="checkbox" checked={memberGroupSelection.includes(item.conversation_id)} disabled={communityBusy || !item.can_manage || fixedAccess} onChange={(e) => setMemberGroupSelection((current) => e.target.checked ? [...current,item.conversation_id] : current.filter((id) => id !== item.conversation_id))} /><span>{item.password_protected ? "🔒 " : ""}{item.title}{fixedAccess ? l(" · acces de administrator", " · administrator access", " · accès administrateur", " · acceso de administrador") : ""}</span></label>;
+          })}</div> : <p className="helper">{l("Comunitatea nu are încă nicio clinică/grup.", "This community has no clinics/groups yet.", "Cette communauté ne contient encore aucune clinique ni aucun groupe.", "Esta comunidad todavía no tiene clínicas ni grupos.")}</p>}
+          {memberGroupOptions.some((item) => item.password_protected) && <p className="protectedGroupNote"><span aria-hidden="true">🔒</span>{l("Grupurile cu parolă sunt vizibile numai după invitație. Accesul poate fi acordat doar de administratorul grupului sau de administratorul general.", "Password-protected groups are visible only after an invitation. Access can be granted only by the group administrator or the general administrator.", "Les groupes protégés par mot de passe ne sont visibles qu’après une invitation. L’accès ne peut être accordé que par l’administrateur du groupe ou l’administrateur général.", "Los grupos protegidos con contraseña solo son visibles después de una invitación. El acceso solo puede concederlo el administrador del grupo o el administrador general.")}</p>}
+          <div className="memberGroupActions"><button type="button" disabled={communityBusy} onClick={() => { setMemberGroupEditorId(null); setMemberGroupOptions([]); setMemberGroupSelection([]); }}>{t("cancel")}</button><button type="button" className="primary" disabled={communityBusy || !memberGroupOptions.length} onClick={() => saveMemberGroupAccess(member)}>{communityBusy ? t("processing") : t("save")}</button></div>
+        </div>}</Fragment>)}</div>
       </div>
       {communityNotice && <p className="success communityNotice" role="status">{communityNotice}</p>}
       {communityError && <p className="error manageError" role="alert">{communityError}</p>}
