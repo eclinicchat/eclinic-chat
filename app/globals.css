@@ -98,3 +98,6 @@ header{min-height:72px;padding:13px 22px;background:#0a1623cc;backdrop-filter:bl
 :root[data-theme="light"] .bubble.mine .messageLink{color:#fff}
 :root[data-theme="light"] .poweredBy,:root[data-theme="light"] .passwordHelp{color:#5b6d82}
 :root[data-theme="light"] *{scrollbar-color:#9aaabe transparent}
+
+/* v1.15 — administrarea membrilor si selectorul de emoji */
+.inviteScope{gap:11px}.inviteScope .checkLabel{font-weight:600}.groupChoiceList{display:grid;gap:8px;margin:0 0 2px 27px;padding:10px 12px;border-left:2px solid var(--line);background:#08152266;border-radius:0 9px 9px 0}.protectedGroupNote{display:flex;align-items:flex-start;gap:7px;margin:2px 0 0;padding:9px 10px;border:1px solid #8a6329;border-radius:9px;background:#3a2a1499;color:#ffd58a;font-size:11px;line-height:1.4}:root[data-theme="light"] .groupChoiceList{background:#edf4fa}:root[data-theme="light"] .protectedGroupNote{background:#fff4d8;color:#654712;border-color:#a37724}

@@ -333,6 +333,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   const [communityBusy, setCommunityBusy] = useState(false);
   const [communityError, setCommunityError] = useState("");
   const [communityNotice, setCommunityNotice] = useState("");
+  const [communityInviteScope, setCommunityInviteScope] = useState("community");
   const [communityInviteGroups, setCommunityInviteGroups] = useState([]);
   const [communityInviteLinks, setCommunityInviteLinks] = useState([]);
   const [inviteStatus, setInviteStatus] = useState("");
@@ -385,6 +386,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   const bottom = useRef(null);
   const messageRefs = useRef({});
   const fileInput = useRef(null);
+  const messageInput = useRef(null);
   const inactivityTimer = useRef(null);
   const warningTimer = useRef(null);
   const countdownTimer = useRef(null);
@@ -395,6 +397,9 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   const selectedCommunity = communities.find((x) => x.id === selectedCommunityId);
   const visibleRooms = rooms.filter((item) => selectedCommunityId === "all" ? true : selectedCommunityId === "private" ? !item.community_id : item.community_id === selectedCommunityId);
   const filteredVisibleRooms = visibleRooms.filter((item) => !roomSearch.trim() || `${item.title} ${item.community_name || ""}`.toLocaleLowerCase().includes(roomSearch.trim().toLocaleLowerCase()));
+  const selectedCommunityRooms = selectedCommunity ? rooms.filter((item) => item.community_id === selectedCommunity.id) : [];
+  const bulkEligibleCommunityRooms = selectedCommunityRooms.filter((item) => !item.password_protected);
+  const protectedCommunityRooms = selectedCommunityRooms.filter((item) => item.password_protected);
   const canCreateGroup = selectedCommunityId === "private"
     ? isGeneralAdmin
     : isGeneralAdmin || communities.some((item) => item.my_is_admin);
@@ -754,11 +759,13 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
 
   function insertEmoji(emoji) {
     setDraft((current) => `${current}${emoji}`);
+    setEmojiOpen(false);
     setRecentEmojis((current) => {
       const next = [emoji,...current.filter((item) => item!==emoji)].slice(0,12);
       window.localStorage.setItem("eclintalk-recent-emojis",JSON.stringify(next));
       return next;
     });
+    window.requestAnimationFrame(() => messageInput.current?.focus());
   }
 
   function groupedReactions(messageId) {
@@ -873,7 +880,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     setCommunityName(selectedCommunity.name);
     setCommunityDescription(selectedCommunity.description || "");
     setCommunityMemberEmails(""); setCommunityMembers([]); setCommunityError(""); setCommunityNotice("");
-    setCommunityInviteGroups([]); setCommunityInviteLinks([]);
+    setCommunityInviteScope("community"); setCommunityInviteGroups([]); setCommunityInviteLinks([]);
     setCommunitySettingsOpen(true);
     await loadCommunityMembers();
   }
@@ -895,13 +902,19 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     const emails = communityMemberEmails.split(/[,\n;]/).map((x) => x.trim().toLowerCase()).filter(Boolean);
     if (!selectedCommunity || !emails.length || communityBusy) return;
     setCommunityBusy(true); setCommunityError(""); setCommunityNotice("");
+    const eligibleGroupIds = bulkEligibleCommunityRooms.map((item) => item.id);
+    const targetGroupIds = communityInviteScope === "community"
+      ? []
+      : communityInviteScope === "all"
+        ? eligibleGroupIds
+        : communityInviteGroups.filter((id) => eligibleGroupIds.includes(id));
     const results = [];
     let addError = null;
     for (const inviteeEmail of emails) {
       const { data, error: invitationError } = await supabase.rpc("create_community_invitation", {
         target_community_id: selectedCommunity.id,
         invitee_email: inviteeEmail,
-        target_conversation_ids: communityInviteGroups,
+        target_conversation_ids: targetGroupIds,
       });
       if (invitationError) { addError = invitationError; break; }
       if (data?.[0]) results.push(data[0]);
@@ -1261,7 +1274,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
           <input ref={fileInput} className="fileInput" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" onChange={chooseFile} />
           <button className="attachBtn" type="button" onClick={() => fileInput.current?.click()} disabled={sending} title={l("Atașează imagine", "Attach image")} aria-label={l("Atașează imagine", "Attach image")}><Icon name="attachment" size={20}/></button>
           <button className={`emojiBtn ${emojiOpen ? "active" : ""}`} type="button" onClick={() => setEmojiOpen(!emojiOpen)} disabled={sending} title={l("Emoticoane", "Emoji")} aria-label={l("Emoticoane", "Emoji")}><Icon name="smile" size={20}/></button>
-	          <input aria-label={l("Mesaj", "Message")} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={t("messagePlaceholder")} maxLength={4000} disabled={sending} autoComplete="off" />
+	          <input ref={messageInput} aria-label={l("Mesaj", "Message")} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={t("messagePlaceholder")} maxLength={4000} disabled={sending} autoComplete="off" />
 	          <button className="primary sendBtn iconTextBtn" disabled={sending || (!draft.trim() && !attachment)}><Icon name="send" size={17}/><span>{sending ? t("sending") : t("send")}</span></button>
 	          {mentionMatch && <div className="mentionPicker" role="listbox" aria-label={t("mentionHint")}>
 	            {mentionSuggestions.length ? mentionSuggestions.map((member) => <button type="button" key={member.user_id} onClick={() => insertMention(member)}><span className="mentionAvatar">{(member.display_name || member.email).slice(0, 2).toUpperCase()}</span><span><strong>{member.display_name || member.email.split("@")[0]}</strong><small>{member.email}</small></span></button>) : <p>{language === "en" ? "No matching member" : "Niciun membru găsit"}</p>}
@@ -1333,8 +1346,12 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
       <form className="manageSection" onSubmit={addCommunityMembers}>
         <div className="sectionHeading"><strong>{l("Adaugă sau invită", "Add or invite")}</strong><small>{l("după email", "by email")}</small></div>
         <label>{l("Adresele de email ale persoanelor", "People's email addresses")}<textarea rows={2} placeholder={l("nume@exemplu.ro, alt.nume@exemplu.ro", "name@example.com, another@example.com")} value={communityMemberEmails} onChange={(e) => setCommunityMemberEmails(e.target.value)} /></label>
-        {rooms.some((item) => item.community_id === selectedCommunity.id) && <fieldset className="inviteGroups"><legend>{l("Adaugă și în grupurile selectate", "Also add to selected groups")}</legend>
-          {rooms.filter((item) => item.community_id === selectedCommunity.id).map((item) => <label className="checkLabel" key={item.id}><input type="checkbox" checked={communityInviteGroups.includes(item.id)} onChange={(e) => setCommunityInviteGroups((current) => e.target.checked ? [...current,item.id] : current.filter((id) => id !== item.id))} />{item.title}</label>)}
+        {selectedCommunityRooms.length > 0 && <fieldset className="inviteGroups inviteScope"><legend>{l("Unde sunt adăugate persoanele", "Where people are added")}</legend>
+          <label className="checkLabel"><input type="radio" name="communityInviteScope" value="community" checked={communityInviteScope === "community"} onChange={() => { setCommunityInviteScope("community"); setCommunityInviteGroups([]); }} />{l("Numai în comunitate", "Community only")}</label>
+          <label className="checkLabel"><input type="radio" name="communityInviteScope" value="all" checked={communityInviteScope === "all"} disabled={!bulkEligibleCommunityRooms.length} onChange={() => { setCommunityInviteScope("all"); setCommunityInviteGroups(bulkEligibleCommunityRooms.map((item) => item.id)); }} />{l(`În toate grupurile existente fără parolă (${bulkEligibleCommunityRooms.length})`, `All existing groups without a password (${bulkEligibleCommunityRooms.length})`)}</label>
+          <label className="checkLabel"><input type="radio" name="communityInviteScope" value="selected" checked={communityInviteScope === "selected"} disabled={!bulkEligibleCommunityRooms.length} onChange={() => setCommunityInviteScope("selected")} />{l("În grupurile selectate", "Selected groups")}</label>
+          {communityInviteScope === "selected" && <div className="groupChoiceList">{bulkEligibleCommunityRooms.map((item) => <label className="checkLabel" key={item.id}><input type="checkbox" checked={communityInviteGroups.includes(item.id)} onChange={(e) => setCommunityInviteGroups((current) => e.target.checked ? [...current,item.id] : current.filter((id) => id !== item.id))} />{item.title}</label>)}</div>}
+          {protectedCommunityRooms.length > 0 && <p className="protectedGroupNote"><span aria-hidden="true">🔒</span>{l(`${protectedCommunityRooms.length} grupuri cu parolă sunt excluse. Membrii se adaugă separat din setările fiecărui grup.`, `${protectedCommunityRooms.length} password-protected groups are excluded. Add members separately from each group's settings.`)}</p>}
         </fieldset>}
         <p className="helper">{l("Conturile existente sunt adăugate imediat. Pentru celelalte adrese vei primi câte un link valabil 7 zile.", "Existing accounts are added immediately. For other addresses, you will receive a link valid for 7 days.")}</p>
         <button className="primary" disabled={communityBusy || !communityMemberEmails.trim()}>{l("Adaugă sau creează invitații", "Add or create invitations")}</button>

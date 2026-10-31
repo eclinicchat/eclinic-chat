@@ -1,6 +1,6 @@
-# eClinTalk v1.14.1
+# eClinTalk v1.15.0
 
-Versiunea v1.14.1 adauga temele Automata, Luminoasa si Intunecata, urmareste setarea dispozitivului in modul Automat si memoreaza alegerea local inclusiv dupa delogare. Tema luminoasa foloseste nuante profesionale gri-albastrui si contrast adaptat. Este corectat si butonul Reia notificarile, care ramane dezactivat atunci cand grupul nu este suspendat temporar. Pastreaza imbunatatirile de accesibilitate si safety din v1.14.0.
+Versiunea v1.15.0 inchide selectorul de emoji imediat dupa alegere si readuce focusul in campul mesajului. Administrarea comunitatii permite adaugarea persoanelor numai in comunitate, in toate grupurile eligibile existente sau in unul ori mai multe grupuri selectate. Grupurile create ulterior nu sunt incluse automat. Grupurile protejate cu parola sunt excluse din operatiile in masa si membrii lor se adauga separat din setarile grupului. Include temele si corectiile din v1.14.1.
 
 Aceasta versiune ramane destinata testarii si comunicarii fara date reale de pacient. Actualizarea nu reprezinta certificare GDPR si nu necesita niciun script SQL nou.
 
