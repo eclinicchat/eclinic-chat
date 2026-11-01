@@ -1,8 +1,10 @@
 # eClinTalk v1.19.2
 
-Versiunea v1.19.2 simplifica actiunile mesajelor. Butoanele afisate permanent sub fiecare mesaj sunt inlocuite de un singur buton discret cu trei puncte. Acesta deschide un meniu profesional cu reactii rapide, Raspunde, Redirectioneaza, Informatii si actiuni de stergere, adaptat pentru telefon, tableta si calculator.
+Versiunea v1.19.2 simplifica actiunile mesajelor. Controalele afisate permanent au fost eliminate complet, iar meniul profesional cu reactii rapide, Raspunde, Redirectioneaza, Informatii si actiuni de stergere se deschide direct prin gest, fara elemente suprapuse peste mesaj sau imagine.
 
 Orice membru poate folosi separat **Fixeaza pentru mine**, **Fixeaza pentru toti** si **Sterge pentru mine**. Optiunea **Sterge pentru toti** este disponibila exclusiv persoanei care a scris mesajul, inclusiv atunci cand administratorul grupului este altcineva. Pentru activarea acestor reguli, ruleaza integral o singura data `supabase-message-preferences-v1.19.2.sql` in Supabase SQL Editor.
+
+Pe telefon si tableta, meniul unui mesaj se deschide prin apasare lunga. Pe Mac si Windows se deschide prin click dreapta sau prin click mentinut. Nu mai apare niciun indicator ori buton peste continut. Meniul afiseaza cinci reactii rapide si butonul **+** pentru lista completa. Vizualizatorul de imagini se inchide prin glisare in jos pe iPhone si Android sau prin comanda Back pe Android, fara buton X.
 
 ## Versiunea v1.19.1
 

@@ -23,6 +23,7 @@ const EMOJI_CATEGORIES = [
   { id: "medical", ro: "Medical", en: "Medical", fr: "Médical", es: "Médico", icon: "🩺", items: ["🩺","🏥","🚑","💊","💉","🩻","🧬","🧪","🦠","🫀","🫁","🧠","🩹","📋","📷","🔬"] },
 ];
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "🤣", "😮", "😢", "👏", "🙏", "🔥", "✅", "👀", "💯"];
+const ALL_REACTION_EMOJIS = [...new Set(EMOJI_CATEGORIES.flatMap((category) => category.items))];
 
 function Icon({ name, size = 18 }) {
   const paths = {
@@ -394,6 +395,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   const [recentEmojis, setRecentEmojis] = useState([]);
   const [reactionTarget, setReactionTarget] = useState(null);
   const [actionMessage, setActionMessage] = useState(null);
+  const [actionReactionsExpanded, setActionReactionsExpanded] = useState(false);
   const [pinnedOpen, setPinnedOpen] = useState(false);
   const [conversationSearchOpen, setConversationSearchOpen] = useState(false);
   const [conversationSearch, setConversationSearch] = useState("");
@@ -406,6 +408,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   const [viewerMessage, setViewerMessage] = useState(null);
   const [viewerZoom, setViewerZoom] = useState(1);
   const [viewerPan, setViewerPan] = useState({ x: 0, y: 0 });
+  const [viewerDismissY, setViewerDismissY] = useState(0);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackBusy, setFeedbackBusy] = useState(false);
@@ -459,7 +462,9 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   const draftRoomId = useRef(null);
   const currentDraft = useRef("");
   const viewerPointers = useRef(new Map());
-  const viewerGesture = useRef({ distance: 0, zoom: 1, startX: 0, startY: 0, panX: 0, panY: 0 });
+  const viewerGesture = useRef({ distance: 0, zoom: 1, startX: 0, startY: 0, panX: 0, panY: 0, dismissY: 0 });
+  const viewerHistoryActive = useRef(false);
+  const messageLongPress = useRef({ timer: null, x: 0, y: 0, triggered: false });
   const swipeStart = useRef(null);
   const room = rooms.find((x) => x.id === roomId);
   const selectedCommunity = communities.find((x) => x.id === selectedCommunityId);
@@ -516,9 +521,19 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   function openImageViewer(item) {
     setViewerZoom(1);
     setViewerPan({ x: 0, y: 0 });
+    setViewerDismissY(0);
     viewerPointers.current.clear();
-    viewerGesture.current = { distance: 0, zoom: 1, startX: 0, startY: 0, panX: 0, panY: 0 };
+    viewerGesture.current = { distance: 0, zoom: 1, startX: 0, startY: 0, panX: 0, panY: 0, dismissY: 0 };
+    if (!viewerHistoryActive.current) {
+      window.history.pushState({ eclintalkViewer: true }, "");
+      viewerHistoryActive.current = true;
+    }
     setViewerMessage(item);
+  }
+
+  function closeImageViewer() {
+    if (viewerHistoryActive.current) window.history.back();
+    else setViewerMessage(null);
   }
 
   function viewerPointerDown(event) {
@@ -526,7 +541,8 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     viewerPointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     const points = [...viewerPointers.current.values()];
     if (points.length >= 2) {
-      viewerGesture.current = { ...viewerGesture.current, distance: Math.hypot(points[0].x-points[1].x,points[0].y-points[1].y), zoom: viewerZoom };
+      setViewerDismissY(0);
+      viewerGesture.current = { ...viewerGesture.current, distance: Math.hypot(points[0].x-points[1].x,points[0].y-points[1].y), zoom: viewerZoom, dismissY: 0 };
     } else {
       viewerGesture.current = { ...viewerGesture.current, startX: event.clientX, startY: event.clientY, panX: viewerPan.x, panY: viewerPan.y };
     }
@@ -544,6 +560,13 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
       if (nextZoom === 1) setViewerPan({ x: 0, y: 0 });
     } else if (points.length === 1 && viewerZoom > 1) {
       setViewerPan({ x: viewerGesture.current.panX + event.clientX-viewerGesture.current.startX, y: viewerGesture.current.panY + event.clientY-viewerGesture.current.startY });
+    } else if (points.length === 1 && viewerZoom === 1) {
+      const deltaX = event.clientX-viewerGesture.current.startX;
+      const deltaY = Math.max(0,event.clientY-viewerGesture.current.startY);
+      if (deltaY > Math.abs(deltaX)) {
+        viewerGesture.current = { ...viewerGesture.current, dismissY: deltaY };
+        setViewerDismissY(deltaY);
+      }
     }
   }
 
@@ -551,7 +574,41 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     viewerPointers.current.delete(event.pointerId);
     const point = [...viewerPointers.current.values()][0];
     if (point) viewerGesture.current = { ...viewerGesture.current, distance: 0, startX: point.x, startY: point.y, panX: viewerPan.x, panY: viewerPan.y, zoom: viewerZoom };
-    else viewerGesture.current = { ...viewerGesture.current, distance: 0, panX: viewerPan.x, panY: viewerPan.y, zoom: viewerZoom };
+    else if (viewerZoom === 1 && viewerGesture.current.dismissY > 110) closeImageViewer();
+    else {
+      setViewerDismissY(0);
+      viewerGesture.current = { ...viewerGesture.current, distance: 0, panX: viewerPan.x, panY: viewerPan.y, zoom: viewerZoom, dismissY: 0 };
+    }
+  }
+
+  function startMessageLongPress(event,item) {
+    if (item.deleted_at) return;
+    window.clearTimeout(messageLongPress.current.timer);
+    messageLongPress.current = { x: event.clientX, y: event.clientY, triggered: false, timer: window.setTimeout(() => {
+      messageLongPress.current.triggered = true;
+      navigator.vibrate?.(12);
+      setActionMessage(item);
+    },420) };
+  }
+
+  function moveMessageLongPress(event) {
+    const press = messageLongPress.current;
+    if (!press.timer || Math.hypot(event.clientX-press.x,event.clientY-press.y) < 12) return;
+    window.clearTimeout(press.timer);
+    press.timer = null;
+  }
+
+  function endMessageLongPress() {
+    window.clearTimeout(messageLongPress.current.timer);
+    messageLongPress.current.timer = null;
+    if (messageLongPress.current.triggered) window.setTimeout(() => { messageLongPress.current.triggered = false; },600);
+  }
+
+  function suppressLongPressClick(event) {
+    if (!messageLongPress.current.triggered) return;
+    event.preventDefault();
+    event.stopPropagation();
+    messageLongPress.current.triggered = false;
   }
 
   function chatTouchStart(event) {
@@ -630,10 +687,25 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   }, [session.access_token]);
 
   useEffect(() => {
+    function handleViewerBack() {
+      if (!viewerHistoryActive.current) return;
+      viewerHistoryActive.current = false;
+      setViewerMessage(null);
+      setViewerDismissY(0);
+    }
+    window.addEventListener("popstate", handleViewerBack);
+    return () => window.removeEventListener("popstate", handleViewerBack);
+  }, []);
+
+  useEffect(() => {
+    if (!actionMessage) setActionReactionsExpanded(false);
+  }, [actionMessage]);
+
+  useEffect(() => {
     function closeWithEscape(event) {
       if (event.key !== "Escape" || logoutWarning) return;
       if (passwordOpen && !passwordBusy) cancelPassword();
-      else if (viewerMessage) setViewerMessage(null);
+      else if (viewerMessage) closeImageViewer();
       else if (receiptMessage) setReceiptMessage(null);
       else if (forwardMessage && !forwardBusy) setForwardMessage(null);
       else if (feedbackOpen && !feedbackBusy) setFeedbackOpen(false);
@@ -1637,7 +1709,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
           {displayedMessages.map((item,index) => { const mine = item.user_id === session.user.id; const replied = messages.find((x) => x.id === item.reply_to_id); const itemReactions = groupedReactions(item.id); const receipt = receiptForMessage(item); const showDay = index===0 || new Date(displayedMessages[index-1].created_at).toDateString()!==new Date(item.created_at).toDateString(); return <Fragment key={item.id}>
             {showDay && <div className="dayDivider" role="separator"><span>{dayLabel(item.created_at,language)}</span></div>}
             {item.id===unreadBoundaryId && <div className="unreadDivider" role="separator"><span>{l("Mesaje noi", "New messages")}</span></div>}
-            <div ref={(node) => { messageRefs.current[item.id] = node; }} className={`messageWrap ${mine ? "mine" : ""}`}>
+            <div ref={(node) => { messageRefs.current[item.id] = node; }} className={`messageWrap ${mine ? "mine" : ""}`} onPointerDown={(event) => startMessageLongPress(event,item)} onPointerMove={moveMessageLongPress} onPointerUp={endMessageLongPress} onPointerCancel={endMessageLongPress} onClickCapture={suppressLongPressClick} onContextMenu={(event) => { event.preventDefault(); setActionMessage(item); }}>
             <div className={`bubble ${mine ? "mine" : ""} ${item.attachment_path ? "hasImage" : ""} ${isMessagePinned(item) ? "pinnedMessage" : ""} ${item.deleted_at ? "deletedMessage" : ""}`}>
               {item.deleted_at ? <p className="deletedText">{l("Mesaj șters", "Deleted message")}</p> : <>
                 {!mine && <strong className="sender">{displayNameForUser(item.user_id, item.sender_email)}</strong>}
@@ -1652,7 +1724,6 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
                 {item.body && <p><LinkifiedText text={item.body} /></p>}
               </>}<small className="messageMeta">{time(item.created_at, language)} {mine && <button type="button" className={receipt.seen.length ? "readReceipt seen" : "readReceipt"} onClick={() => openReceipts(item)} aria-label={l("Informații de citire", "Read information", "Informations de lecture", "Información de lectura")}>{receipt.seen.length ? "✓✓" : "✓"}</button>}</small>
             </div>
-            {!item.deleted_at && <button type="button" className="messageMenuTrigger" onClick={() => setActionMessage(item)} aria-label={l("Acțiuni pentru mesaj", "Message actions", "Actions du message", "Acciones del mensaje")} title={l("Acțiuni", "Actions", "Actions", "Acciones")}><span aria-hidden="true">•••</span></button>}
             {!item.deleted_at && Object.keys(itemReactions).length > 0 && <div className="reactionSummary">{Object.entries(itemReactions).map(([emoji, info]) => <button aria-label={l(`${info.count} reacții ${emoji}`, `${info.count} ${emoji} reactions`, `${info.count} réactions ${emoji}`, `${info.count} reacciones ${emoji}`)} className={info.mine ? "mine" : ""} key={emoji} onClick={() => reactToMessage(item.id, emoji)}>{emoji} {info.count}</button>)}</div>}
           </div></Fragment>; })}<div ref={bottom} />
         </div>
@@ -1673,12 +1744,13 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
 	          {visibleRooms.length > 0 && <div className="homeConversationList">{visibleRooms.map((item) => <button className={!item.password_protected && item.unread_count > 0 ? "unread" : ""} key={item.id} onClick={() => chooseRoom(item.id)}><span>{item.title.slice(0,2).toUpperCase()}</span><div><strong className="conversationTitle">{item.is_pinned && <Icon name="pin" size={12}/>}<span>{item.title}</span>{!item.password_protected && item.unread_count > 0 && <i className="unreadBadge">{item.unread_count > 99 ? "99+" : item.unread_count}</i>}</strong><small>{item.member_count} {t("members")} · {item.community_name || t("groupWithoutCommunity")}</small></div></button>)}</div>}
 	          {!visibleRooms.length && canCreateGroup && <button className="primary" onClick={() => setModal(true)}>{t("firstGroup")}</button>}{error && <p className="chatError" role="alert">{error}</p>}</div></>}
     </section>
-    {viewerMessage && imageUrls[viewerMessage.attachment_path] && <div className="mediaViewerBackdrop" onMouseDown={() => setViewerMessage(null)}><section className="mediaViewer" role="dialog" aria-modal="true" aria-label={l("Vizualizator imagine", "Image viewer", "Visionneuse d’image", "Visor de imágenes")} onMouseDown={(event) => event.stopPropagation()}>
-      <div className="mediaViewerToolbar"><span>{viewerMessage.attachment_name || l("Imagine", "Image", "Image", "Imagen")}</span><div><small>{l("Apropie două degete pentru zoom · trage pentru deplasare", "Pinch to zoom · drag to pan", "Pincez pour zoomer · faites glisser pour déplacer", "Pellizca para ampliar · arrastra para mover")}</small><strong>{Math.round(viewerZoom*100)}%</strong><button onClick={() => setViewerMessage(null)} aria-label={l("Închide", "Close", "Fermer", "Cerrar")}>×</button></div></div>
+    {viewerMessage && imageUrls[viewerMessage.attachment_path] && <div className="mediaViewerBackdrop" onMouseDown={closeImageViewer}><section className="mediaViewer" style={{ transform: `translateY(${viewerDismissY}px)`, opacity: Math.max(.35,1-viewerDismissY/500) }} role="dialog" aria-modal="true" aria-label={l("Vizualizator imagine", "Image viewer", "Visionneuse d’image", "Visor de imágenes")} onMouseDown={(event) => event.stopPropagation()}>
+      <div className="mediaViewerToolbar"><span>{viewerMessage.attachment_name || l("Imagine", "Image", "Image", "Imagen")}</span><div><small>{l("Zoom cu două degete · glisează în jos pentru închidere", "Pinch to zoom · swipe down to close", "Pincez pour zoomer · glissez vers le bas pour fermer", "Pellizca para ampliar · desliza hacia abajo para cerrar")}</small><strong>{Math.round(viewerZoom*100)}%</strong></div></div>
       <div className={`mediaViewerCanvas ${room?.protected_content ? "protected" : ""}`} onPointerDown={viewerPointerDown} onPointerMove={viewerPointerMove} onPointerUp={viewerPointerUp} onPointerCancel={viewerPointerUp} onContextMenu={room?.protected_content ? (event) => event.preventDefault() : undefined}><img draggable={false} style={{ transform: `translate3d(${viewerPan.x}px,${viewerPan.y}px,0) scale(${viewerZoom})` }} src={imageUrls[viewerMessage.attachment_path]} alt={viewerMessage.attachment_name || l("Imagine", "Image")} />{room?.protected_content && <span className="viewerWatermark">{protectedWatermark}</span>}</div>
     </section></div>}
     {actionMessage && !actionMessage.deleted_at && <div className="messageActionBackdrop" onMouseDown={() => setActionMessage(null)}><section className="messageActionSheet" role="dialog" aria-modal="true" aria-label={l("Acțiuni pentru mesaj", "Message actions", "Actions du message", "Acciones del mensaje")} onMouseDown={(event) => event.stopPropagation()}>
-      <div className="quickReactions" role="group" aria-label={l("Reacții rapide", "Quick reactions", "Réactions rapides", "Reacciones rápidas")}>{REACTION_EMOJIS.map((emoji) => <button type="button" aria-label={l(`Reacție ${emoji}`, `React ${emoji}`, `Réagir avec ${emoji}`, `Reaccionar con ${emoji}`)} key={emoji} onClick={() => { reactToMessage(actionMessage.id, emoji); setActionMessage(null); }}>{emoji}</button>)}</div>
+      <div className="quickReactions" role="group" aria-label={l("Reacții rapide", "Quick reactions", "Réactions rapides", "Reacciones rápidas")}>{REACTION_EMOJIS.slice(0,5).map((emoji) => <button type="button" aria-label={l(`Reacție ${emoji}`, `React ${emoji}`, `Réagir avec ${emoji}`, `Reaccionar con ${emoji}`)} key={emoji} onClick={() => { reactToMessage(actionMessage.id, emoji); setActionMessage(null); }}>{emoji}</button>)}<button type="button" className="moreReactionsBtn" aria-expanded={actionReactionsExpanded} aria-label={l("Mai multe reacții", "More reactions", "Plus de réactions", "Más reacciones")} onClick={() => setActionReactionsExpanded((current) => !current)}>＋</button></div>
+      {actionReactionsExpanded && <div className="allReactionGrid" role="group" aria-label={l("Toate reacțiile", "All reactions", "Toutes les réactions", "Todas las reacciones")}>{ALL_REACTION_EMOJIS.map((emoji) => <button type="button" aria-label={l(`Reacție ${emoji}`, `React ${emoji}`, `Réagir avec ${emoji}`, `Reaccionar con ${emoji}`)} key={emoji} onClick={() => { reactToMessage(actionMessage.id, emoji); setActionMessage(null); }}>{emoji}</button>)}</div>}
       <div className="messageActionList">
         <button type="button" onClick={() => { setReplyTo(actionMessage); setActionMessage(null); }}><Icon name="reply" size={19}/><span>{l("Răspunde", "Reply", "Répondre", "Responder")}</span></button>
         <button type="button" onClick={() => { const selected = actionMessage; setActionMessage(null); openForward(selected); }}><Icon name="forward" size={19}/><span>{l("Redirecționează", "Forward", "Transférer", "Reenviar")}</span></button>
