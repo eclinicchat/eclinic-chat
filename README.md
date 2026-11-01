@@ -1,4 +1,12 @@
-# eClinTalk v1.18.0
+# eClinTalk v1.19.0
+
+Versiunea v1.19.0 adauga redirectionarea securizata a mesajelor, confirmari de citire cu listele **Vazut de** si **Nevazut de**, cautare in conversatie, filtru pentru mesajele fixate, vizualizator de imagini pe tot ecranul cu zoom si un formular de feedback. Actiunile Raspunde, Redirectioneaza, Pin, Informatii si Sterge sunt disponibile direct langa mesajele cu imagini sau fisiere.
+
+Continutul unui grup protejat poate fi redirectionat numai catre un alt grup protejat in care utilizatorul este membru. Aplicatia copiaza atasamentul in grupul destinatie si pastreaza marcajul ca mesaj redirectionat.
+
+Inainte de publicarea acestei versiuni, ruleaza integral o singura data `supabase-messaging-v1.19.sql` in Supabase SQL Editor.
+
+## Versiunea v1.18.0
 
 Versiunea v1.18.0 adauga o fereastra clara cu informatiile grupului: membri, imagini, fisiere si linkuri partajate. Mesajele accepta acum, pe langa imagini, documente PDF, Word, Excel si fisiere text de maximum 20 MB.
 
