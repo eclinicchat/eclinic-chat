@@ -385,13 +385,13 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   const [communityNotice, setCommunityNotice] = useState("");
   const [communityInviteScope, setCommunityInviteScope] = useState("community");
   const [communityInviteGroups, setCommunityInviteGroups] = useState([]);
-  const [communityHistoryAccess, setCommunityHistoryAccess] = useState("new");
+  const [communityHistoryAccess, setCommunityHistoryAccess] = useState("");
   const [communityInviteLinks, setCommunityInviteLinks] = useState([]);
   const [invitationLanguage, setInvitationLanguage] = useState(language);
   const [memberGroupEditorId, setMemberGroupEditorId] = useState(null);
   const [memberGroupOptions, setMemberGroupOptions] = useState([]);
   const [memberGroupSelection, setMemberGroupSelection] = useState([]);
-  const [memberGroupHistoryAccess, setMemberGroupHistoryAccess] = useState("new");
+  const [memberGroupHistoryAccess, setMemberGroupHistoryAccess] = useState("");
   const [inviteStatus, setInviteStatus] = useState("");
   const [roomId, setRoomId] = useState(null);
   const [unlockedRoomId, setUnlockedRoomId] = useState(null);
@@ -441,7 +441,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   const [members, setMembers] = useState([]);
   const [settingsTitle, setSettingsTitle] = useState("");
   const [newMemberEmails, setNewMemberEmails] = useState("");
-  const [newMemberHistoryAccess, setNewMemberHistoryAccess] = useState("new");
+  const [newMemberHistoryAccess, setNewMemberHistoryAccess] = useState("");
   const [settingsBusy, setSettingsBusy] = useState(false);
   const [settingsError, setSettingsError] = useState("");
   const [passwordOpen, setPasswordOpen] = useState(false);
@@ -1298,7 +1298,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     setFeedbackBusy(true); setFeedbackNotice("");
     const { error: feedbackError } = await supabase.rpc("submit_app_feedback", {
       feedback_message: feedbackText.trim(),
-      feedback_context: { room_id: roomId, version: "1.20.3", language, user_agent: navigator.userAgent },
+      feedback_context: { room_id: roomId, version: "1.20.4", language, user_agent: navigator.userAgent },
     });
     if (feedbackError) setFeedbackNotice(feedbackError.message);
     else {
@@ -1398,7 +1398,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     setCommunityDescription(selectedCommunity.description || "");
     setCommunityMemberEmails(""); setCommunityMembers([]); setCommunityError(""); setCommunityNotice("");
     setCommunityInviteScope("community"); setCommunityInviteGroups([]); setCommunityInviteLinks([]);
-    setCommunityHistoryAccess("new");
+    setCommunityHistoryAccess("");
     setMemberGroupEditorId(null); setMemberGroupOptions([]); setMemberGroupSelection([]);
     if (window.innerWidth <= 760 && mobileMenuOpen) {
       setMobileMenuOpen(false);
@@ -1425,7 +1425,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
       setMemberGroupEditorId(member.user_id);
       setMemberGroupOptions(options);
       setMemberGroupSelection(options.filter((item) => item.is_member).map((item) => item.conversation_id));
-      setMemberGroupHistoryAccess("new");
+      setMemberGroupHistoryAccess("");
     }
     setCommunityBusy(false);
   }
@@ -1434,6 +1434,17 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     if (!selectedCommunity || communityBusy || memberGroupEditorId !== member.user_id) return;
     const allowedIds = memberGroupOptions.filter((item) => item.can_manage).map((item) => item.conversation_id);
     const selectedIds = memberGroupSelection.filter((id) => allowedIds.includes(id));
+    const newlyAddedIds = selectedIds.filter((id) => !memberGroupOptions.some((item) => item.conversation_id === id && item.is_member));
+    if (newlyAddedIds.length && !memberGroupHistoryAccess) {
+      setCommunityError(l("Alege dacă membrul poate vedea istoricul grupurilor adăugate acum.", "Choose whether the member can see the history of the groups being added now.", "Choisissez si le membre peut voir l’historique des groupes ajoutés maintenant.", "Elige si el miembro puede ver el historial de los grupos añadidos ahora."));
+      return;
+    }
+    if (newlyAddedIds.length && !window.confirm(l(
+      `Acorzi acces la ${newlyAddedIds.length} grupuri pentru ${member.display_name || member.email}. Istoric: ${memberGroupHistoryAccess === "all" ? "complet" : "numai mesajele viitoare"}. Continui?`,
+      `Give ${member.display_name || member.email} access to ${newlyAddedIds.length} groups. History: ${memberGroupHistoryAccess === "all" ? "full" : "new messages only"}. Continue?`,
+      `Donner à ${member.display_name || member.email} l’accès à ${newlyAddedIds.length} groupes. Historique : ${memberGroupHistoryAccess === "all" ? "complet" : "nouveaux messages uniquement"}. Continuer ?`,
+      `Dar a ${member.display_name || member.email} acceso a ${newlyAddedIds.length} grupos. Historial: ${memberGroupHistoryAccess === "all" ? "completo" : "solo mensajes nuevos"}. ¿Continuar?`,
+    ))) return;
     setCommunityBusy(true); setCommunityError(""); setCommunityNotice("");
     const { error: accessError } = await supabase.rpc("set_community_member_groups", {
       target_community_id: selectedCommunity.id,
@@ -1480,6 +1491,16 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
       : communityInviteScope === "all"
         ? eligibleGroupIds
         : communityInviteGroups.filter((id) => eligibleGroupIds.includes(id));
+    if (targetGroupIds.length && !communityHistoryAccess) {
+      setCommunityError(l("Alege dacă persoanele invitate pot vedea istoricul grupurilor.", "Choose whether invited people can see the group history.", "Choisissez si les personnes invitées peuvent voir l’historique des groupes.", "Elige si las personas invitadas pueden ver el historial de los grupos."));
+      return;
+    }
+    if (targetGroupIds.length && !window.confirm(l(
+      `Adaugi ${emails.length} ${emails.length === 1 ? "persoană" : "persoane"} în ${targetGroupIds.length} ${targetGroupIds.length === 1 ? "grup" : "grupuri"}. Istoric: ${communityHistoryAccess === "all" ? "complet" : "numai mesajele viitoare"}. Continui?`,
+      `Add ${emails.length} ${emails.length === 1 ? "person" : "people"} to ${targetGroupIds.length} ${targetGroupIds.length === 1 ? "group" : "groups"}. History: ${communityHistoryAccess === "all" ? "full" : "new messages only"}. Continue?`,
+      `Ajouter ${emails.length} personne(s) à ${targetGroupIds.length} groupe(s). Historique : ${communityHistoryAccess === "all" ? "complet" : "nouveaux messages uniquement"}. Continuer ?`,
+      `Añadir ${emails.length} persona(s) a ${targetGroupIds.length} grupo(s). Historial: ${communityHistoryAccess === "all" ? "completo" : "solo mensajes nuevos"}. ¿Continuar?`,
+    ))) return;
     const results = [];
     let addError = null;
     for (const inviteeEmail of emails) {
@@ -1598,7 +1619,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     }
     setSettingsTitle(room?.title || "");
     setNewMemberEmails("");
-    setNewMemberHistoryAccess("new");
+    setNewMemberHistoryAccess("");
     setGroupPassword("");
     setProtectedContent(Boolean(room?.protected_content));
     setMembers([]);
@@ -1751,6 +1772,16 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     e.preventDefault();
     const emails = newMemberEmails.split(/[,\n;]/).map((x) => x.trim().toLowerCase()).filter(Boolean);
     if (!emails.length || settingsBusy) return;
+    if (!newMemberHistoryAccess) {
+      setSettingsError(l("Alege dacă membrii noi pot vedea istoricul grupului.", "Choose whether new members can see the group history.", "Choisissez si les nouveaux membres peuvent voir l’historique du groupe.", "Elige si los nuevos miembros pueden ver el historial del grupo."));
+      return;
+    }
+    if (!window.confirm(l(
+      `Adaugi ${emails.length} ${emails.length === 1 ? "membru" : "membri"}. Istoric: ${newMemberHistoryAccess === "all" ? "complet" : "numai mesajele trimise după înscriere"}. Continui?`,
+      `Add ${emails.length} ${emails.length === 1 ? "member" : "members"}. History: ${newMemberHistoryAccess === "all" ? "full" : "messages sent after joining only"}. Continue?`,
+      `Ajouter ${emails.length} membre(s). Historique : ${newMemberHistoryAccess === "all" ? "complet" : "messages envoyés après l’inscription uniquement"}. Continuer ?`,
+      `Añadir ${emails.length} miembro(s). Historial: ${newMemberHistoryAccess === "all" ? "completo" : "solo mensajes enviados después de unirse"}. ¿Continuar?`,
+    ))) return;
     setSettingsBusy(true); setSettingsError("");
     const { error: addError } = await supabase.rpc("add_conversation_members", {
       target_conversation_id: roomId,
@@ -1760,7 +1791,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     if (addError) setSettingsError(addError.message);
     else {
       setNewMemberEmails("");
-      setNewMemberHistoryAccess("new");
+      setNewMemberHistoryAccess("");
       await Promise.all([loadMembers(), loadRooms(roomId)]);
     }
     setSettingsBusy(false);
@@ -2047,8 +2078,9 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
         <fieldset className="inviteGroups historyChoice"><legend>{l("Ce istoric vor putea vedea?", "What message history can they see?", "Quel historique pourront-ils voir ?", "¿Qué historial podrán ver?")}</legend>
           <label className="checkLabel"><input type="radio" name="newMemberHistory" value="new" checked={newMemberHistoryAccess === "new"} onChange={() => setNewMemberHistoryAccess("new")} />{l("Numai mesajele trimise după înscriere", "Only messages sent after joining", "Uniquement les messages envoyés après l’inscription", "Solo los mensajes enviados después de unirse")}</label>
           <label className="checkLabel"><input type="radio" name="newMemberHistory" value="all" checked={newMemberHistoryAccess === "all"} onChange={() => setNewMemberHistoryAccess("all")} />{l("Tot istoricul grupului", "Full group history", "Tout l’historique du groupe", "Todo el historial del grupo")}</label>
+          {!newMemberHistoryAccess && <p className="historyRequired" role="status">{l("Selectează obligatoriu una dintre variante înainte de adăugare.", "Select one option before adding members.", "Sélectionnez une option avant d’ajouter les membres.", "Selecciona una opción antes de añadir miembros.")}</p>}
         </fieldset>
-        <button className="primary" disabled={settingsBusy || !newMemberEmails.trim()}>{l("Adaugă", "Add")}</button>
+        <button className="primary" disabled={settingsBusy || !newMemberEmails.trim() || !newMemberHistoryAccess}>{l("Adaugă și confirmă", "Add and confirm", "Ajouter et confirmer", "Añadir y confirmar")}</button>
       </form>}
       {isAdmin && <form className="manageSection" onSubmit={saveGroupPassword}>
         <div className="sectionHeading"><strong>{l("Parolă suplimentară", "Additional password")}</strong><small>{passwordProtected ? l("Activă", "Active") : l("Inactivă", "Inactive")}</small></div>
@@ -2072,18 +2104,19 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
         <div className="sectionHeading"><strong>{l("Adaugă membri sau creează invitații", "Add members or create invitations", "Ajouter des membres ou créer des invitations", "Añadir miembros o crear invitaciones")}</strong><small>{l("după email", "by email")}</small></div>
         <label>{l("Adresele de email ale persoanelor", "People's email addresses")}<textarea rows={2} placeholder={l("nume@exemplu.ro, alt.nume@exemplu.ro", "name@example.com, another@example.com")} value={communityMemberEmails} onChange={(e) => setCommunityMemberEmails(e.target.value)} /></label>
         {selectedCommunityRooms.length > 0 && <fieldset className="inviteGroups inviteScope"><legend>{l("Unde sunt adăugate persoanele", "Where people are added")}</legend>
-          <label className="checkLabel"><input type="radio" name="communityInviteScope" value="community" checked={communityInviteScope === "community"} onChange={() => { setCommunityInviteScope("community"); setCommunityInviteGroups([]); }} />{l("Numai în comunitate", "Community only")}</label>
-          <label className="checkLabel"><input type="radio" name="communityInviteScope" value="all" checked={communityInviteScope === "all"} disabled={!bulkEligibleCommunityRooms.length} onChange={() => { setCommunityInviteScope("all"); setCommunityInviteGroups(bulkEligibleCommunityRooms.map((item) => item.id)); }} />{l(`În toate grupurile existente fără parolă (${bulkEligibleCommunityRooms.length})`, `All existing groups without a password (${bulkEligibleCommunityRooms.length})`, `Tous les groupes existants sans mot de passe (${bulkEligibleCommunityRooms.length})`, `Todos los grupos existentes sin contraseña (${bulkEligibleCommunityRooms.length})`)}</label>
-          <label className="checkLabel"><input type="radio" name="communityInviteScope" value="selected" checked={communityInviteScope === "selected"} disabled={!bulkEligibleCommunityRooms.length} onChange={() => setCommunityInviteScope("selected")} />{l("În grupurile selectate", "Selected groups")}</label>
+          <label className="checkLabel"><input type="radio" name="communityInviteScope" value="community" checked={communityInviteScope === "community"} onChange={() => { setCommunityInviteScope("community"); setCommunityInviteGroups([]); setCommunityHistoryAccess(""); }} />{l("Numai în comunitate", "Community only")}</label>
+          <label className="checkLabel"><input type="radio" name="communityInviteScope" value="all" checked={communityInviteScope === "all"} disabled={!bulkEligibleCommunityRooms.length} onChange={() => { setCommunityInviteScope("all"); setCommunityInviteGroups(bulkEligibleCommunityRooms.map((item) => item.id)); setCommunityHistoryAccess(""); }} />{l(`În toate grupurile existente fără parolă (${bulkEligibleCommunityRooms.length})`, `All existing groups without a password (${bulkEligibleCommunityRooms.length})`, `Tous les groupes existants sans mot de passe (${bulkEligibleCommunityRooms.length})`, `Todos los grupos existentes sin contraseña (${bulkEligibleCommunityRooms.length})`)}</label>
+          <label className="checkLabel"><input type="radio" name="communityInviteScope" value="selected" checked={communityInviteScope === "selected"} disabled={!bulkEligibleCommunityRooms.length} onChange={() => { setCommunityInviteScope("selected"); setCommunityHistoryAccess(""); }} />{l("În grupurile selectate", "Selected groups")}</label>
           {communityInviteScope === "selected" && <div className="groupChoiceList">{bulkEligibleCommunityRooms.map((item) => <label className="checkLabel" key={item.id}><input type="checkbox" checked={communityInviteGroups.includes(item.id)} onChange={(e) => setCommunityInviteGroups((current) => e.target.checked ? [...current,item.id] : current.filter((id) => id !== item.id))} />{item.title}</label>)}</div>}
           {protectedCommunityRooms.length > 0 && <p className="protectedGroupNote"><span aria-hidden="true">🔒</span>{l(`${protectedCommunityRooms.length} grupuri cu parolă sunt excluse. Membrii se adaugă separat din setările fiecărui grup.`, `${protectedCommunityRooms.length} password-protected groups are excluded. Add members separately from each group's settings.`, `${protectedCommunityRooms.length} groupes protégés par mot de passe sont exclus. Ajoutez les membres séparément dans les paramètres de chaque groupe.`, `${protectedCommunityRooms.length} grupos protegidos con contraseña están excluidos. Añade los miembros por separado desde los ajustes de cada grupo.`)}</p>}
         </fieldset>}
         {communityInviteScope !== "community" && <fieldset className="inviteGroups historyChoice"><legend>{l("Ce istoric vor putea vedea în grupurile selectate?", "What history can they see in the selected groups?", "Quel historique pourront-ils voir dans les groupes sélectionnés ?", "¿Qué historial podrán ver en los grupos seleccionados?")}</legend>
           <label className="checkLabel"><input type="radio" name="communityHistory" value="new" checked={communityHistoryAccess === "new"} onChange={() => setCommunityHistoryAccess("new")} />{l("Numai mesajele trimise după înscriere", "Only messages sent after joining", "Uniquement les messages envoyés après l’inscription", "Solo los mensajes enviados después de unirse")}</label>
           <label className="checkLabel"><input type="radio" name="communityHistory" value="all" checked={communityHistoryAccess === "all"} onChange={() => setCommunityHistoryAccess("all")} />{l("Tot istoricul grupurilor", "Full group history", "Tout l’historique des groupes", "Todo el historial de los grupos")}</label>
+          {!communityHistoryAccess && <p className="historyRequired" role="status">{l("Administratorul trebuie să aleagă una dintre variante.", "The administrator must choose one option.", "L’administrateur doit choisir une option.", "El administrador debe elegir una opción.")}</p>}
         </fieldset>}
         <p className="helper">{l("Conturile existente sunt adăugate imediat. Pentru celelalte adrese se creează un link valabil 7 zile, pe care îl poți trimite prin WhatsApp sau e-mail.", "Existing accounts are added immediately. For other addresses, a link valid for 7 days is created and can be sent by WhatsApp or email.", "Les comptes existants sont ajoutés immédiatement. Pour les autres adresses, un lien valable 7 jours est créé et peut être envoyé par WhatsApp ou e-mail.", "Las cuentas existentes se añaden inmediatamente. Para las demás direcciones se crea un enlace válido durante 7 días que puedes enviar por WhatsApp o correo electrónico.")}</p>
-        <button className="primary" disabled={communityBusy || !communityMemberEmails.trim()}>{l("Adaugă / creează invitațiile", "Add / create invitations", "Ajouter / créer les invitations", "Añadir / crear invitaciones")}</button>
+        <button className="primary" disabled={communityBusy || !communityMemberEmails.trim() || (communityInviteScope !== "community" && (!communityHistoryAccess || (communityInviteScope === "selected" && !communityInviteGroups.length)))}>{l("Adaugă / creează invitațiile", "Add / create invitations", "Ajouter / créer les invitations", "Añadir / crear invitaciones")}</button>
       </form>
       {communityInviteLinks.length>0 && <div className="manageSection invitationResults"><div className="sectionHeading"><strong>{l("Linkuri de trimis", "Links to share", "Liens à partager", "Enlaces para compartir")}</strong><small>{communityInviteLinks.length}</small></div>
         <label className="invitationLanguageLabel">{l("Limba invitației", "Invitation language", "Langue de l’invitation", "Idioma de la invitación")}<select value={invitationLanguage} onChange={(e) => setInvitationLanguage(e.target.value)}><option value="ro">Română</option><option value="en">English</option><option value="fr">Français</option><option value="es">Español</option></select></label>
@@ -2102,8 +2135,9 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
           <fieldset className="inviteGroups historyChoice"><legend>{l("Pentru grupurile adăugate acum", "For groups added now", "Pour les groupes ajoutés maintenant", "Para los grupos añadidos ahora")}</legend>
             <label className="checkLabel"><input type="radio" name={`memberGroupHistory-${member.user_id}`} value="new" checked={memberGroupHistoryAccess === "new"} onChange={() => setMemberGroupHistoryAccess("new")} />{l("Numai mesajele viitoare", "New messages only", "Nouveaux messages uniquement", "Solo mensajes nuevos")}</label>
             <label className="checkLabel"><input type="radio" name={`memberGroupHistory-${member.user_id}`} value="all" checked={memberGroupHistoryAccess === "all"} onChange={() => setMemberGroupHistoryAccess("all")} />{l("Tot istoricul", "Full history", "Tout l’historique", "Todo el historial")}</label>
+            {!memberGroupHistoryAccess && memberGroupSelection.some((id) => !memberGroupOptions.some((item) => item.conversation_id === id && item.is_member)) && <p className="historyRequired" role="status">{l("Alege istoricul pentru grupurile bifate acum.", "Choose the history for groups selected now.", "Choisissez l’historique pour les groupes sélectionnés maintenant.", "Elige el historial para los grupos seleccionados ahora.")}</p>}
           </fieldset>
-          <div className="memberGroupActions"><button type="button" disabled={communityBusy} onClick={() => { setMemberGroupEditorId(null); setMemberGroupOptions([]); setMemberGroupSelection([]); }}>{t("cancel")}</button><button type="button" className="primary" disabled={communityBusy || !memberGroupOptions.length} onClick={() => saveMemberGroupAccess(member)}>{communityBusy ? t("processing") : t("save")}</button></div>
+          <div className="memberGroupActions"><button type="button" disabled={communityBusy} onClick={() => { setMemberGroupEditorId(null); setMemberGroupOptions([]); setMemberGroupSelection([]); setMemberGroupHistoryAccess(""); }}>{t("cancel")}</button><button type="button" className="primary" disabled={communityBusy || !memberGroupOptions.length || (memberGroupSelection.some((id) => !memberGroupOptions.some((item) => item.conversation_id === id && item.is_member)) && !memberGroupHistoryAccess)} onClick={() => saveMemberGroupAccess(member)}>{communityBusy ? t("processing") : t("save")}</button></div>
         </div>}</Fragment>)}</div>
       </div>
       {communityNotice && <p className="success communityNotice" role="status">{communityNotice}</p>}

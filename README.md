@@ -1,4 +1,12 @@
-# eClinTalk v1.20.3
+# eClinTalk v1.20.4
+
+Versiunea v1.20.4 face obligatorie alegerea accesului la istoricul mesajelor atunci cand un administrator adauga persoane intr-un grup, le invita in grupurile unei comunitati sau le acorda ulterior acces la alte grupuri. Nu mai exista o optiune selectata implicit: administratorul trebuie sa aleaga intre **numai mesajele viitoare** si **tot istoricul**, apoi confirma un rezumat cu numarul persoanelor, grupurile si regula de istoric aleasa.
+
+Numele grupului poate fi modificat in continuare de proprietar sau administrator din **Setari → Numele grupului**. Interfata explica vizibil cand alegerea istoricului este obligatorie si dezactiveaza actiunea pana la completarea ei, in romana, engleza, franceza si spaniola.
+
+Actualizarea foloseste structura de baza de date introdusa in v1.20.1. Daca fisierul `supabase-member-history-v1.20.1.sql` a fost deja rulat, v1.20.4 nu necesita un script SQL nou.
+
+## Versiunea v1.20.3
 
 Versiunea v1.20.3 adauga cautare dupa numele grupului sau al comunitatii in fereastra **Redirectioneaza**. Destinatiile sunt prezentate intr-o lista clara, iar grupul ales este evidentiat inainte de confirmare.
 
