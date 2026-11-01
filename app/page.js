@@ -530,10 +530,14 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   function chooseCommunity(id) {
     setSelectedCommunityId(id);
     setRoomId(null);
+    setConversationSearch("");
+    setConversationSearchOpen(false);
   }
 
   function chooseRoom(id) {
     setActionRoom(null);
+    setConversationSearch("");
+    setConversationSearchOpen(false);
     setRoomId(id);
     setMobileMenuOpen(false);
   }
@@ -805,6 +809,10 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
       .catch(() => active && setPushEnabled(false));
     return () => { active = false; };
   }, [session.access_token]);
+
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 760px)").matches) setMobileMenuOpen(true);
+  }, []);
 
   useEffect(() => {
     function handleViewerBack() {
@@ -1392,6 +1400,10 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     setCommunityInviteScope("community"); setCommunityInviteGroups([]); setCommunityInviteLinks([]);
     setCommunityHistoryAccess("new");
     setMemberGroupEditorId(null); setMemberGroupOptions([]); setMemberGroupSelection([]);
+    if (window.innerWidth <= 760 && mobileMenuOpen) {
+      setMobileMenuOpen(false);
+      await new Promise((resolve) => window.setTimeout(resolve, 220));
+    }
     setCommunitySettingsOpen(true);
     await loadCommunityMembers();
   }
@@ -1862,7 +1874,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     </aside>
     {mobileMenuOpen && <button className="sideBackdrop" onClick={() => setMobileMenuOpen(false)} aria-label={l("Închide meniul", "Close menu")} />}
     {inviteStatus && <div className="inviteToast" role="status"><span>{inviteStatus}</span><button onClick={() => setInviteStatus("")} aria-label={l("Închide", "Close")}>×</button></div>}
-    <section id="conversation-content" tabIndex="-1" aria-label={room ? l(`Conversația ${room.title}`, `${room.title} conversation`, `Conversation ${room.title}`, `Conversación ${room.title}`) : t("yourConversations")} className={`chat ${room ? "" : "chatEmpty"}`} onTouchStart={chatTouchStart} onTouchEnd={chatTouchEnd}>
+    <section id="conversation-content" tabIndex="-1" aria-label={room ? l(`Conversația ${room.title}`, `${room.title} conversation`, `Conversation ${room.title}`, `Conversación ${room.title}`) : t("yourConversations")} className={`chat ${room ? "" : "chatEmpty"} ${conversationSearchOpen ? "searchOpen" : ""}`} onTouchStart={chatTouchStart} onTouchEnd={chatTouchEnd}>
       {room ? <><header><button className="mobileMenuBtn iconTextBtn" onClick={() => setMobileMenuOpen(true)} aria-controls="group-menu" aria-expanded={mobileMenuOpen}><Icon name="menu"/><span className="srOnly">{l("Meniu", "Menu")}</span></button><div className="headerMain"><button className="groupInfoButton" onClick={openGroupInfo} title={l("Deschide informațiile grupului", "Open group information", "Ouvrir les informations du groupe", "Abrir la información del grupo")}><strong>{room.title}</strong><small>{room.member_count} {t("members")} · {room.community_name || t("groupWithoutCommunity")} · {room.protected_content ? `🛡 ${l("conținut protejat", "protected content", "contenu protégé", "contenido protegido")}` : l("numai membrii au acces", "members only")}</small></button></div><div className="headerActions"><b>● {l("Privat", "Private")}</b><button className={`iconTextBtn ${conversationSearchOpen ? "active" : ""}`} onClick={() => setConversationSearchOpen((current) => !current)}><Icon name="search" size={16}/>{l("Caută", "Search", "Rechercher", "Buscar")}</button><button className={`iconTextBtn ${pinnedOnly ? "active" : ""}`} onClick={() => setPinnedOnly((current) => !current)}><Icon name="pin" size={16}/>{l("Fixate", "Pinned", "Épinglés", "Fijados")}</button><button className="iconTextBtn" onClick={() => toggleGroupPin()}><Icon name="pin" size={16}/>{room.is_pinned ? l("Fixat", "Pinned") : "Pin"}</button><button className="iconTextBtn" onClick={openSettings}><Icon name="settings" size={16}/>{l("Setări", "Settings")}</button></div></header>
         <div className="warning" role="note"><span aria-hidden="true">⚠</span>{t("testWarning")}</div>
         {conversationSearchOpen && <div className="conversationSearchBar"><Icon name="search" size={17}/><input autoFocus value={conversationSearch} onChange={(event) => setConversationSearch(event.target.value)} placeholder={l("Caută mesaje, persoane sau fișiere", "Search messages, people, or files", "Rechercher des messages, personnes ou fichiers", "Buscar mensajes, personas o archivos")} /><button onClick={() => { setConversationSearch(""); setConversationSearchOpen(false); }} aria-label={l("Închide căutarea", "Close search", "Fermer la recherche", "Cerrar búsqueda")}>×</button></div>}

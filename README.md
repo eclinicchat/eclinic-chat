@@ -6,6 +6,8 @@ Pentru mesajele care contin text, meniul mesajului include acum **Copiaza textul
 
 Vizualizatorul imaginilor are pe desktop comenzi compacte pentru marire, micsorare, revenire la 100% si inchidere. Imaginea marita poate fi deplasata cu mouse-ul, iar watermark-ul ramane fixat discret in coltul inferior, fara sa ajunga in mijlocul fotografiei. Pe telefon si tableta raman active zoom-ul si pan-ul cu degetele, precum si inchiderea prin glisare. Actualizarea nu necesita un script SQL nou.
 
+Pe telefon, dupa autentificare se deschide direct meniul complet al comunitatilor si grupurilor. Butonul **Membri si setari** inchide mai intai meniul lateral si apoi deschide administrarea comunitatii deasupra lui. Campul de cautare din conversatie are acum propriul rand in layout, astfel incat mesajele si informatia despre lipsa rezultatelor nu se mai suprapun peste textul cautarii.
+
 ## Versiunea v1.20.2
 
 Versiunea v1.20.2 adauga in vizualizatorul imaginilor o sageata discreta pentru distribuire si analiza externa. Meniul nativ al telefonului poate trimite imaginea catre WhatsApp sau catre alte aplicatii compatibile instalate. Sunt disponibile si scurtaturi pentru Google Lens, ChatGPT si Claude; cand transferul direct nu este acceptat, imaginea este descarcata pentru a fi atasata manual.
