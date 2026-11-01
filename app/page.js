@@ -403,6 +403,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   const [forwardBusy, setForwardBusy] = useState(false);
   const [viewerMessage, setViewerMessage] = useState(null);
   const [viewerZoom, setViewerZoom] = useState(1);
+  const [viewerPan, setViewerPan] = useState({ x: 0, y: 0 });
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackBusy, setFeedbackBusy] = useState(false);
@@ -455,6 +456,9 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   const previousRoomId = useRef(null);
   const draftRoomId = useRef(null);
   const currentDraft = useRef("");
+  const viewerPointers = useRef(new Map());
+  const viewerGesture = useRef({ distance: 0, zoom: 1, startX: 0, startY: 0, panX: 0, panY: 0 });
+  const swipeStart = useRef(null);
   const room = rooms.find((x) => x.id === roomId);
   const selectedCommunity = communities.find((x) => x.id === selectedCommunityId);
   const visibleRooms = rooms.filter((item) => selectedCommunityId === "all" ? true : selectedCommunityId === "private" ? !item.community_id : item.community_id === selectedCommunityId);
@@ -502,6 +506,62 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   function chooseRoom(id) {
     setRoomId(id);
     setMobileMenuOpen(false);
+  }
+
+  function openImageViewer(item) {
+    setViewerZoom(1);
+    setViewerPan({ x: 0, y: 0 });
+    viewerPointers.current.clear();
+    viewerGesture.current = { distance: 0, zoom: 1, startX: 0, startY: 0, panX: 0, panY: 0 };
+    setViewerMessage(item);
+  }
+
+  function viewerPointerDown(event) {
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    viewerPointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    const points = [...viewerPointers.current.values()];
+    if (points.length >= 2) {
+      viewerGesture.current = { ...viewerGesture.current, distance: Math.hypot(points[0].x-points[1].x,points[0].y-points[1].y), zoom: viewerZoom };
+    } else {
+      viewerGesture.current = { ...viewerGesture.current, startX: event.clientX, startY: event.clientY, panX: viewerPan.x, panY: viewerPan.y };
+    }
+  }
+
+  function viewerPointerMove(event) {
+    if (!viewerPointers.current.has(event.pointerId)) return;
+    event.preventDefault();
+    viewerPointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    const points = [...viewerPointers.current.values()];
+    if (points.length >= 2 && viewerGesture.current.distance > 0) {
+      const distance = Math.hypot(points[0].x-points[1].x,points[0].y-points[1].y);
+      const nextZoom = Math.min(4,Math.max(1,viewerGesture.current.zoom*(distance/viewerGesture.current.distance)));
+      setViewerZoom(nextZoom);
+      if (nextZoom === 1) setViewerPan({ x: 0, y: 0 });
+    } else if (points.length === 1 && viewerZoom > 1) {
+      setViewerPan({ x: viewerGesture.current.panX + event.clientX-viewerGesture.current.startX, y: viewerGesture.current.panY + event.clientY-viewerGesture.current.startY });
+    }
+  }
+
+  function viewerPointerUp(event) {
+    viewerPointers.current.delete(event.pointerId);
+    const point = [...viewerPointers.current.values()][0];
+    if (point) viewerGesture.current = { ...viewerGesture.current, distance: 0, startX: point.x, startY: point.y, panX: viewerPan.x, panY: viewerPan.y, zoom: viewerZoom };
+    else viewerGesture.current = { ...viewerGesture.current, distance: 0, panX: viewerPan.x, panY: viewerPan.y, zoom: viewerZoom };
+  }
+
+  function chatTouchStart(event) {
+    const touch = event.touches?.[0];
+    swipeStart.current = touch && touch.clientX <= 36 ? { x: touch.clientX, y: touch.clientY } : null;
+  }
+
+  function chatTouchEnd(event) {
+    const start = swipeStart.current;
+    const touch = event.changedTouches?.[0];
+    swipeStart.current = null;
+    if (!start || !touch || window.innerWidth > 760) return;
+    const dx = touch.clientX-start.x;
+    const dy = touch.clientY-start.y;
+    if (dx > 72 && Math.abs(dx) > Math.abs(dy)*1.25) setMobileMenuOpen(true);
   }
 
   function insertMention(member) {
@@ -1513,16 +1573,15 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
       <nav className="conversationList" aria-label={l("Lista conversațiilor", "Conversation list")}>
         {loading && <p className="status">{t("loading")}</p>}
         {!loading && filteredVisibleRooms.length === 0 && <p className="emptySide">{roomSearch ? l("Niciun grup nu corespunde căutării.", "No groups match your search.") : l("Nu ai conversații în această secțiune.", "You have no conversations in this section.")}</p>}
-        {filteredVisibleRooms.map((item) => <button aria-current={item.id === roomId ? "page" : undefined} className={`conv ${item.id === roomId ? "active" : ""}`} key={item.id} onClick={() => chooseRoom(item.id)}>
-          <span>{item.title.slice(0, 2).toUpperCase()}</span><div><strong>{item.is_pinned && <Icon name="pin" size={12}/>} {item.title}</strong><small>{item.member_count} {t("members")} · {item.community_name || t("groupWithoutCommunity")}</small></div>
-          {!item.password_protected && item.unread_count > 0 && <i className="unreadBadge">{item.unread_count > 99 ? "99+" : item.unread_count}</i>}
+        {filteredVisibleRooms.map((item) => <button aria-current={item.id === roomId ? "page" : undefined} className={`conv ${item.id === roomId ? "active" : ""} ${!item.password_protected && item.unread_count > 0 ? "unread" : ""}`} key={item.id} onClick={() => chooseRoom(item.id)}>
+          <span>{item.title.slice(0, 2).toUpperCase()}</span><div><strong className="conversationTitle">{item.is_pinned && <Icon name="pin" size={12}/>}<span>{item.title}</span>{!item.password_protected && item.unread_count > 0 && <i className="unreadBadge">{item.unread_count > 99 ? "99+" : item.unread_count}</i>}</strong><small>{item.member_count} {t("members")} · {item.community_name || t("groupWithoutCommunity")}</small></div>
         </button>)}
       </nav>
       <div className="sideFooter"><button className="profileBtn" onClick={openProfile}><strong>{profileName || session.user.email}</strong><small>{t("profile")} · {isGeneralAdmin ? t("generalAdmin") : t("connected")}</small></button><button className="logoutBtn" onClick={signOut} title={t("logout")}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10" /></svg><span>{t("logout")}</span></button><button className="feedbackBtn" onClick={() => { setFeedbackNotice(""); setFeedbackOpen(true); }}>💬 {l("Feedback", "Feedback", "Avis", "Comentarios")}</button><p className="poweredBy sideCredit">{t("createdBy")}</p></div>
     </aside>
     {mobileMenuOpen && <button className="sideBackdrop" onClick={() => setMobileMenuOpen(false)} aria-label={l("Închide meniul", "Close menu")} />}
     {inviteStatus && <div className="inviteToast" role="status"><span>{inviteStatus}</span><button onClick={() => setInviteStatus("")} aria-label={l("Închide", "Close")}>×</button></div>}
-    <section id="conversation-content" tabIndex="-1" aria-label={room ? l(`Conversația ${room.title}`, `${room.title} conversation`, `Conversation ${room.title}`, `Conversación ${room.title}`) : t("yourConversations")} className={`chat ${room ? "" : "chatEmpty"}`}>
+    <section id="conversation-content" tabIndex="-1" aria-label={room ? l(`Conversația ${room.title}`, `${room.title} conversation`, `Conversation ${room.title}`, `Conversación ${room.title}`) : t("yourConversations")} className={`chat ${room ? "" : "chatEmpty"}`} onTouchStart={chatTouchStart} onTouchEnd={chatTouchEnd}>
       {room ? <><header><button className="mobileMenuBtn iconTextBtn" onClick={() => setMobileMenuOpen(true)} aria-controls="group-menu" aria-expanded={mobileMenuOpen}><Icon name="menu"/><span className="srOnly">{l("Meniu", "Menu")}</span></button><div className="headerMain"><button className="groupInfoButton" onClick={openGroupInfo} title={l("Deschide informațiile grupului", "Open group information", "Ouvrir les informations du groupe", "Abrir la información del grupo")}><strong>{room.title}</strong><small>{room.member_count} {t("members")} · {room.community_name || t("groupWithoutCommunity")} · {room.protected_content ? `🛡 ${l("conținut protejat", "protected content", "contenu protégé", "contenido protegido")}` : l("numai membrii au acces", "members only")}</small></button></div><div className="headerActions"><b>● {l("Privat", "Private")}</b><button className={`iconTextBtn ${conversationSearchOpen ? "active" : ""}`} onClick={() => setConversationSearchOpen((current) => !current)}><Icon name="search" size={16}/>{l("Caută", "Search", "Rechercher", "Buscar")}</button><button className={`iconTextBtn ${pinnedOnly ? "active" : ""}`} onClick={() => setPinnedOnly((current) => !current)}><Icon name="pin" size={16}/>{l("Fixate", "Pinned", "Épinglés", "Fijados")}</button><button className="iconTextBtn" onClick={toggleGroupPin}><Icon name="pin" size={16}/>{room.is_pinned ? l("Fixat", "Pinned") : "Pin"}</button><button className="iconTextBtn" onClick={openSettings}><Icon name="settings" size={16}/>{l("Setări", "Settings")}</button></div></header>
         <div className="warning" role="note"><span aria-hidden="true">⚠</span>{t("testWarning")}</div>
         {conversationSearchOpen && <div className="conversationSearchBar"><Icon name="search" size={17}/><input autoFocus value={conversationSearch} onChange={(event) => setConversationSearch(event.target.value)} placeholder={l("Caută mesaje, persoane sau fișiere", "Search messages, people, or files", "Rechercher des messages, personnes ou fichiers", "Buscar mensajes, personas o archivos")} /><button onClick={() => { setConversationSearch(""); setConversationSearchOpen(false); }} aria-label={l("Închide căutarea", "Close search", "Fermer la recherche", "Cerrar búsqueda")}>×</button></div>}
@@ -1552,7 +1611,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
                   <strong>{replied ? displayNameForUser(replied.user_id, replied.sender_email) : l("Mesaj anterior", "Previous message")}</strong><span>{replied?.deleted_at ? l("Mesaj șters", "Deleted message") : replied?.body || replied?.attachment_name || (replied?.attachment_path ? l("Fișier atașat", "Attached file", "Fichier joint", "Archivo adjunto") : l("Mesaj indisponibil", "Message unavailable"))}</span>
                   {!replied?.deleted_at && replied?.attachment_path && (replied.attachment_type || "").startsWith("image/") && imageUrls[replied.attachment_path] && <img draggable={room.protected_content ? false : undefined} src={imageUrls[replied.attachment_path]} alt={l("Imagine citată", "Quoted image")} />}
                 </button>}
-                {item.attachment_path && imageUrls[item.attachment_path] && ((item.attachment_type || "").startsWith("image/") ? (room.protected_content ? <button type="button" className="mediaViewerButton protectedMedia" onContextMenu={(e) => e.preventDefault()} onClick={() => { setViewerZoom(1); setViewerMessage(item); }}><img draggable="false" className="chatImage" src={imageUrls[item.attachment_path]} alt={item.attachment_name || l("Imagine atașată", "Attached image")} /><span className="mediaWatermark" aria-hidden="true">{protectedWatermark}</span><span className="openMediaHint"><Icon name="zoom" size={15}/></span></button> : <button type="button" className="mediaViewerButton" onClick={() => { setViewerZoom(1); setViewerMessage(item); }}><img className="chatImage" src={imageUrls[item.attachment_path]} alt={item.attachment_name || l("Imagine atașată", "Attached image")} /><span className="openMediaHint"><Icon name="zoom" size={15}/></span></button>) : <a className="fileAttachment" href={imageUrls[item.attachment_path]} target="_blank" rel="noreferrer" onContextMenu={room.protected_content ? (e) => e.preventDefault() : undefined}><span aria-hidden="true">📄</span><span><strong>{item.attachment_name || l("Fișier atașat", "Attached file")}</strong><small>{item.attachment_size ? `${Math.max(1, Math.round(item.attachment_size / 1024))} KB` : l("Deschide fișierul", "Open file")}</small></span></a>)}
+                {item.attachment_path && imageUrls[item.attachment_path] && ((item.attachment_type || "").startsWith("image/") ? (room.protected_content ? <button type="button" className="mediaViewerButton protectedMedia" onContextMenu={(e) => e.preventDefault()} onClick={() => openImageViewer(item)}><img draggable="false" className="chatImage" src={imageUrls[item.attachment_path]} alt={item.attachment_name || l("Imagine atașată", "Attached image")} /><span className="mediaWatermark" aria-hidden="true">{protectedWatermark}</span><span className="openMediaHint"><Icon name="zoom" size={15}/></span></button> : <button type="button" className="mediaViewerButton" onClick={() => openImageViewer(item)}><img className="chatImage" src={imageUrls[item.attachment_path]} alt={item.attachment_name || l("Imagine atașată", "Attached image")} /><span className="openMediaHint"><Icon name="zoom" size={15}/></span></button>) : <a className="fileAttachment" href={imageUrls[item.attachment_path]} target="_blank" rel="noreferrer" onContextMenu={room.protected_content ? (e) => e.preventDefault() : undefined}><span aria-hidden="true">📄</span><span><strong>{item.attachment_name || l("Fișier atașat", "Attached file")}</strong><small>{item.attachment_size ? `${Math.max(1, Math.round(item.attachment_size / 1024))} KB` : l("Deschide fișierul", "Open file")}</small></span></a>)}
                 {item.attachment_path && !imageUrls[item.attachment_path] && <p className="imageLoading">{l("Se încarcă fișierul...", "Loading file...", "Chargement du fichier…", "Cargando archivo…")}</p>}
                 {item.body && <p><LinkifiedText text={item.body} /></p>}
               </>}<small className="messageMeta">{time(item.created_at, language)} {mine && <button type="button" className={receipt.seen.length ? "readReceipt seen" : "readReceipt"} onClick={() => openReceipts(item)} aria-label={l("Informații de citire", "Read information", "Informations de lecture", "Información de lectura")}>{receipt.seen.length ? "✓✓" : "✓"}</button>}</small>
@@ -1578,12 +1637,12 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
           {attachment && <div className="selectedFile"><span>{attachment.name}</span><button type="button" aria-label={l("Elimină atașamentul", "Remove attachment")} onClick={() => { setAttachment(null); if (fileInput.current) fileInput.current.value = ""; }}>×</button></div>}
         </form></div></> :
 	        <><div className="mobileWelcomeBar"><button className="mobileMenuBtn iconTextBtn" onClick={() => setMobileMenuOpen(true)} aria-controls="group-menu" aria-expanded={mobileMenuOpen}><Icon name="menu"/><span>{t("myConversations")}</span></button></div><div className="welcome conversationHome"><div className="logo">eC</div><h2>{selectedCommunity?.name || t("yourConversations")}</h2><p>{visibleRooms.length ? t("chooseConversation") : t("noConversations")}</p>
-	          {visibleRooms.length > 0 && <div className="homeConversationList">{visibleRooms.map((item) => <button key={item.id} onClick={() => chooseRoom(item.id)}><span>{item.title.slice(0,2).toUpperCase()}</span><div><strong>{item.is_pinned && <Icon name="pin" size={12}/>} {item.title}</strong><small>{item.member_count} {t("members")} · {item.community_name || t("groupWithoutCommunity")}</small></div>{!item.password_protected && item.unread_count > 0 && <i className="unreadBadge">{item.unread_count > 99 ? "99+" : item.unread_count}</i>}</button>)}</div>}
+	          {visibleRooms.length > 0 && <div className="homeConversationList">{visibleRooms.map((item) => <button className={!item.password_protected && item.unread_count > 0 ? "unread" : ""} key={item.id} onClick={() => chooseRoom(item.id)}><span>{item.title.slice(0,2).toUpperCase()}</span><div><strong className="conversationTitle">{item.is_pinned && <Icon name="pin" size={12}/>}<span>{item.title}</span>{!item.password_protected && item.unread_count > 0 && <i className="unreadBadge">{item.unread_count > 99 ? "99+" : item.unread_count}</i>}</strong><small>{item.member_count} {t("members")} · {item.community_name || t("groupWithoutCommunity")}</small></div></button>)}</div>}
 	          {!visibleRooms.length && canCreateGroup && <button className="primary" onClick={() => setModal(true)}>{t("firstGroup")}</button>}{error && <p className="chatError" role="alert">{error}</p>}</div></>}
     </section>
     {viewerMessage && imageUrls[viewerMessage.attachment_path] && <div className="mediaViewerBackdrop" onMouseDown={() => setViewerMessage(null)}><section className="mediaViewer" role="dialog" aria-modal="true" aria-label={l("Vizualizator imagine", "Image viewer", "Visionneuse d’image", "Visor de imágenes")} onMouseDown={(event) => event.stopPropagation()}>
-      <div className="mediaViewerToolbar"><span>{viewerMessage.attachment_name || l("Imagine", "Image", "Image", "Imagen")}</span><div><button onClick={() => setViewerZoom((value) => Math.max(.5,value-.25))} aria-label={l("Micșorează", "Zoom out", "Réduire", "Alejar")}>−</button><strong>{Math.round(viewerZoom*100)}%</strong><button onClick={() => setViewerZoom((value) => Math.min(4,value+.25))} aria-label={l("Mărește", "Zoom in", "Agrandir", "Acercar")}>＋</button><button onClick={() => setViewerMessage(null)} aria-label={l("Închide", "Close", "Fermer", "Cerrar")}>×</button></div></div>
-      <div className={`mediaViewerCanvas ${room?.protected_content ? "protected" : ""}`} onContextMenu={room?.protected_content ? (event) => event.preventDefault() : undefined}><img draggable={!room?.protected_content} style={{ transform: `scale(${viewerZoom})` }} src={imageUrls[viewerMessage.attachment_path]} alt={viewerMessage.attachment_name || l("Imagine", "Image")} />{room?.protected_content && <span className="viewerWatermark">{protectedWatermark}</span>}</div>
+      <div className="mediaViewerToolbar"><span>{viewerMessage.attachment_name || l("Imagine", "Image", "Image", "Imagen")}</span><div><small>{l("Apropie două degete pentru zoom · trage pentru deplasare", "Pinch to zoom · drag to pan", "Pincez pour zoomer · faites glisser pour déplacer", "Pellizca para ampliar · arrastra para mover")}</small><strong>{Math.round(viewerZoom*100)}%</strong><button onClick={() => setViewerMessage(null)} aria-label={l("Închide", "Close", "Fermer", "Cerrar")}>×</button></div></div>
+      <div className={`mediaViewerCanvas ${room?.protected_content ? "protected" : ""}`} onPointerDown={viewerPointerDown} onPointerMove={viewerPointerMove} onPointerUp={viewerPointerUp} onPointerCancel={viewerPointerUp} onContextMenu={room?.protected_content ? (event) => event.preventDefault() : undefined}><img draggable={false} style={{ transform: `translate3d(${viewerPan.x}px,${viewerPan.y}px,0) scale(${viewerZoom})` }} src={imageUrls[viewerMessage.attachment_path]} alt={viewerMessage.attachment_name || l("Imagine", "Image")} />{room?.protected_content && <span className="viewerWatermark">{protectedWatermark}</span>}</div>
     </section></div>}
     {forwardMessage && <div className="modalBackdrop" onMouseDown={() => !forwardBusy && setForwardMessage(null)}><section className="modal passwordModal" role="dialog" aria-modal="true" aria-labelledby="forward-title" onMouseDown={(event) => event.stopPropagation()}><div className="modalTitle"><div><p className="eyebrow">eClinTalk</p><h2 id="forward-title">{l("Redirecționează", "Forward", "Transférer", "Reenviar")}</h2></div><button className="iconBtn" disabled={forwardBusy} onClick={() => setForwardMessage(null)}>×</button></div><form className="form" onSubmit={confirmForward}><p className="muted">{forwardMessage.body || forwardMessage.attachment_name || l("Mesaj cu atașament", "Message with attachment", "Message avec pièce jointe", "Mensaje con archivo adjunto")}</p><label>{l("Grupul destinație", "Destination group", "Groupe de destination", "Grupo de destino")}<select required value={forwardTargetId} onChange={(event) => setForwardTargetId(event.target.value)}><option value="">{l("Alege un grup", "Choose a group", "Choisir un groupe", "Elige un grupo")}</option>{forwardTargets.map((target) => <option value={target.id} key={target.id}>{target.protected_content ? "🛡 " : ""}{target.title} · {target.community_name || t("groupWithoutCommunity")}</option>)}</select></label>{room?.protected_content && <p className="protectedContentNotice">🛡 {l("Acest mesaj poate fi redirecționat numai către un alt grup cu Conținut protejat activ.", "This message can only be forwarded to another group with Protected content enabled.", "Ce message ne peut être transféré que vers un autre groupe protégé.", "Este mensaje solo puede reenviarse a otro grupo protegido.")}</p>}{!forwardTargets.length && <p className="error">{l("Nu există niciun grup eligibil pentru redirecționare.", "There is no eligible group for forwarding.", "Aucun groupe n’est disponible pour le transfert.", "No hay ningún grupo disponible para reenviar.")}</p>}<div className="modalActions"><button type="button" disabled={forwardBusy} onClick={() => setForwardMessage(null)}>{t("cancel")}</button><button className="primary" disabled={forwardBusy || !forwardTargetId}>{forwardBusy ? l("Se redirecționează...", "Forwarding...", "Transfert…", "Reenviando…") : l("Redirecționează", "Forward", "Transférer", "Reenviar")}</button></div></form></section></div>}
     {receiptMessage && (() => { const details=receiptForMessage(receiptMessage); return <div className="modalBackdrop" onMouseDown={() => setReceiptMessage(null)}><section className="modal receiptModal" role="dialog" aria-modal="true" aria-labelledby="receipt-title" onMouseDown={(event) => event.stopPropagation()}><div className="modalTitle"><div><p className="eyebrow">{l("Mesaj", "Message", "Message", "Mensaje")}</p><h2 id="receipt-title">{l("Informații de citire", "Read information", "Informations de lecture", "Información de lectura")}</h2></div><button className="iconBtn" onClick={() => setReceiptMessage(null)}>×</button></div><div className="receiptSection"><h3>✓✓ {l("Văzut de", "Seen by", "Vu par", "Visto por")} <small>{details.seen.length}</small></h3>{details.seen.length ? details.seen.map((marker) => <div className="receiptPerson" key={marker.user_id}><span className="memberAvatar">{(marker.display_name || marker.email).slice(0,2).toUpperCase()}</span><div><strong>{marker.display_name || marker.email}</strong><small>{new Date(marker.last_read_at).toLocaleString(LANGUAGE_LOCALES[language])}</small></div></div>) : <p className="muted">{l("Niciun destinatar nu a văzut încă mesajul.", "No recipient has seen the message yet.", "Aucun destinataire n’a encore vu le message.", "Ningún destinatario ha visto aún el mensaje.")}</p>}</div><div className="receiptSection"><h3>○ {l("Nevăzut de", "Not seen by", "Non vu par", "No visto por")} <small>{details.unseen.length}</small></h3>{details.unseen.map((marker) => <div className="receiptPerson" key={marker.user_id}><span className="memberAvatar">{(marker.display_name || marker.email).slice(0,2).toUpperCase()}</span><div><strong>{marker.display_name || marker.email}</strong><small>{marker.email}</small></div></div>)}</div></section></div>; })()}

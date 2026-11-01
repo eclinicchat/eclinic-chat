@@ -1,4 +1,8 @@
-# eClinTalk v1.19.0
+# eClinTalk v1.19.1
+
+Versiunea v1.19.1 adauga gesturi naturale pe telefon: zoom prin apropierea sau departarea a doua degete, deplasarea imaginii marite prin tragere si deschiderea listei conversatiilor prin glisare din marginea stanga spre dreapta. Grupurile cu mesaje necitite afiseaza numarul imediat dupa titlu, iar titlul este evidentiat cromatic. Actualizarea nu necesita un script SQL nou dupa instalarea v1.19.0.
+
+## Versiunea v1.19.0
 
 Versiunea v1.19.0 adauga redirectionarea securizata a mesajelor, confirmari de citire cu listele **Vazut de** si **Nevazut de**, cautare in conversatie, filtru pentru mesajele fixate, vizualizator de imagini pe tot ecranul cu zoom si un formular de feedback. Actiunile Raspunde, Redirectioneaza, Pin, Informatii si Sterge sunt disponibile direct langa mesajele cu imagini sau fisiere.
 
