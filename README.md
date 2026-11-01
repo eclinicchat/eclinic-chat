@@ -1,4 +1,12 @@
-# eClinTalk v1.20.2
+# eClinTalk v1.20.3
+
+Versiunea v1.20.3 adauga cautare dupa numele grupului sau al comunitatii in fereastra **Redirectioneaza**. Destinatiile sunt prezentate intr-o lista clara, iar grupul ales este evidentiat inainte de confirmare.
+
+Pentru mesajele care contin text, meniul mesajului include acum **Copiaza textul** pe iPhone, Android, Mac si Windows. Pe Mac si Windows, textul poate fi si selectat direct cu mouse-ul. Meniul discret al fiecarui mesaj include si **Distribuie**, care deschide meniul nativ al dispozitivului pentru text, imagini si fisiere; daca sistemul nu ofera distribuire nativa, textul este copiat, iar fisierul este descarcat. In grupurile cu Continut protejat, distribuirea externa ramane indisponibila.
+
+Vizualizatorul imaginilor are pe desktop comenzi compacte pentru marire, micsorare, revenire la 100% si inchidere. Imaginea marita poate fi deplasata cu mouse-ul, iar watermark-ul ramane fixat discret in coltul inferior, fara sa ajunga in mijlocul fotografiei. Pe telefon si tableta raman active zoom-ul si pan-ul cu degetele, precum si inchiderea prin glisare. Actualizarea nu necesita un script SQL nou.
+
+## Versiunea v1.20.2
 
 Versiunea v1.20.2 adauga in vizualizatorul imaginilor o sageata discreta pentru distribuire si analiza externa. Meniul nativ al telefonului poate trimite imaginea catre WhatsApp sau catre alte aplicatii compatibile instalate. Sunt disponibile si scurtaturi pentru Google Lens, ChatGPT si Claude; cand transferul direct nu este acceptat, imaginea este descarcata pentru a fi atasata manual.
 
