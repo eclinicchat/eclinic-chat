@@ -385,6 +385,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   const [roomId, setRoomId] = useState(null);
   const [unlockedRoomId, setUnlockedRoomId] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [messagePreferences, setMessagePreferences] = useState([]);
   const [reactions, setReactions] = useState([]);
   const [draft, setDraft] = useState("");
   const [replyTo, setReplyTo] = useState(null);
@@ -392,6 +393,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   const [emojiCategory, setEmojiCategory] = useState("faces");
   const [recentEmojis, setRecentEmojis] = useState([]);
   const [reactionTarget, setReactionTarget] = useState(null);
+  const [actionMessage, setActionMessage] = useState(null);
   const [pinnedOpen, setPinnedOpen] = useState(false);
   const [conversationSearchOpen, setConversationSearchOpen] = useState(false);
   const [conversationSearch, setConversationSearch] = useState("");
@@ -472,17 +474,20 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   const currentMembership = members.find((x) => x.user_id === session.user.id);
   const isOwner = room?.created_by === session.user.id;
   const isAdmin = Boolean(isOwner || currentMembership?.is_admin);
-  const pinnedMessages = messages.filter((x) => x.pinned_at).sort((a, b) => new Date(b.pinned_at) - new Date(a.pinned_at));
-  const displayedMessages = messages.filter((item) => {
-    if (pinnedOnly && !item.pinned_at) return false;
+  const preferenceForMessage = (messageId) => messagePreferences.find((item) => item.message_id === messageId);
+  const isMessagePinned = (item) => Boolean(item.pinned_at || preferenceForMessage(item.id)?.pinned_at);
+  const visibleMessages = messages.filter((item) => !preferenceForMessage(item.id)?.hidden_at);
+  const pinnedMessages = visibleMessages.filter(isMessagePinned).sort((a, b) => new Date(preferenceForMessage(b.id)?.pinned_at || b.pinned_at) - new Date(preferenceForMessage(a.id)?.pinned_at || a.pinned_at));
+  const displayedMessages = visibleMessages.filter((item) => {
+    if (pinnedOnly && !isMessagePinned(item)) return false;
     const query = conversationSearch.trim().toLocaleLowerCase();
     if (!query) return true;
     return `${item.body || ""} ${item.attachment_name || ""} ${item.sender_email || ""}`.toLocaleLowerCase().includes(query);
   });
   const displayNameForUser = (userId, fallback) => members.find((member) => member.user_id === userId)?.display_name || fallback || l("Utilizator", "User");
-  const sharedMedia = messages.filter((item) => !item.deleted_at && item.attachment_path && (item.attachment_type || "").startsWith("image/"));
-  const sharedFiles = messages.filter((item) => !item.deleted_at && item.attachment_path && !(item.attachment_type || "").startsWith("image/"));
-  const sharedLinks = messages.flatMap((item) => linksFromText(item.deleted_at ? "" : item.body || "").map((url) => ({ url, messageId: item.id, createdAt: item.created_at, sender: displayNameForUser(item.user_id, item.sender_email) })));
+  const sharedMedia = visibleMessages.filter((item) => !item.deleted_at && item.attachment_path && (item.attachment_type || "").startsWith("image/"));
+  const sharedFiles = visibleMessages.filter((item) => !item.deleted_at && item.attachment_path && !(item.attachment_type || "").startsWith("image/"));
+  const sharedLinks = visibleMessages.flatMap((item) => linksFromText(item.deleted_at ? "" : item.body || "").map((url) => ({ url, messageId: item.id, createdAt: item.created_at, sender: displayNameForUser(item.user_id, item.sender_email) })));
   const protectedWatermark = `${profileName || session.user.email || "eClinTalk"} · ${new Date().toLocaleDateString(LANGUAGE_LOCALES[language] || LANGUAGE_LOCALES.ro)}`;
   const forwardTargets = rooms.filter((item) => item.id !== roomId && !item.password_protected && (!room?.protected_content || item.protected_content));
   const mentionMatch = draft.match(/(?:^|\s)@([^\s@]*)$/);
@@ -639,13 +644,14 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
       else if (modal) setModal(false);
       else if (communityModal) setCommunityModal(false);
       else if (emojiOpen) setEmojiOpen(false);
+      else if (actionMessage) setActionMessage(null);
       else if (reactionTarget) setReactionTarget(null);
       else if (pinnedOpen) setPinnedOpen(false);
       else if (mobileMenuOpen) setMobileMenuOpen(false);
     }
     document.addEventListener("keydown", closeWithEscape);
     return () => document.removeEventListener("keydown", closeWithEscape);
-  }, [logoutWarning, passwordOpen, passwordBusy, viewerMessage, receiptMessage, forwardMessage, forwardBusy, feedbackOpen, feedbackBusy, settingsOpen, settingsBusy, groupInfoOpen, communitySettingsOpen, communityBusy, profileOpen, profileBusy, modal, communityModal, emojiOpen, reactionTarget, pinnedOpen, mobileMenuOpen]);
+  }, [logoutWarning, passwordOpen, passwordBusy, viewerMessage, receiptMessage, forwardMessage, forwardBusy, feedbackOpen, feedbackBusy, settingsOpen, settingsBusy, groupInfoOpen, communitySettingsOpen, communityBusy, profileOpen, profileBusy, modal, communityModal, emojiOpen, actionMessage, reactionTarget, pinnedOpen, mobileMenuOpen]);
 
   useEffect(() => {
     const previous = previousRoomId.current;
@@ -793,15 +799,17 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     return () => { active = false; };
   }, [roomId]);
   useEffect(() => {
-    if (!roomId || unlockedRoomId !== roomId) { setMessages([]); setReactions([]); setUnreadBoundaryId(null); return; }
+    if (!roomId || unlockedRoomId !== roomId) { setMessages([]); setMessagePreferences([]); setReactions([]); setUnreadBoundaryId(null); return; }
     let active = true;
     setMessages([]);
+    setMessagePreferences([]);
     setReactions([]);
     setError("");
     Promise.all([
       supabase.from("private_messages").select("*").eq("conversation_id", roomId).order("created_at").limit(500),
       supabase.from("message_reactions").select("*").eq("conversation_id", roomId),
-    ]).then(([messageResult, reactionResult]) => {
+      supabase.rpc("get_my_message_preferences", { target_conversation_id: roomId }),
+    ]).then(([messageResult, reactionResult, preferenceResult]) => {
         if (!active) return;
         if (messageResult.error) setError(l("Mesajele nu au putut fi încărcate.", "Messages could not be loaded."));
         else {
@@ -811,6 +819,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
           setMessages(list);
         }
         if (!reactionResult.error) setReactions(reactionResult.data || []);
+        if (!preferenceResult.error) setMessagePreferences(preferenceResult.data || []);
         supabase.rpc("mark_conversation_read", { target_conversation_id: roomId }).then(() => loadRooms(roomId));
       });
     const channel = supabase.channel(`private:${roomId}`).on("postgres_changes", {
@@ -930,9 +939,36 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     if (reactionError) setError(reactionError.message);
   }
 
-  async function toggleMessagePin(messageId) {
-    const { error: pinError } = await supabase.rpc("toggle_message_pin", { target_message_id: messageId });
-    if (pinError) setError(pinError.message);
+  async function togglePersonalMessagePin(messageId) {
+    const { data, error: pinError } = await supabase.rpc("toggle_personal_message_pin", { target_message_id: messageId });
+    if (pinError) { setError(pinError.message); return; }
+    setMessagePreferences((current) => {
+      const existing = current.find((item) => item.message_id === messageId);
+      const next = { message_id: messageId, pinned_at: data || null, hidden_at: existing?.hidden_at || null };
+      return existing ? current.map((item) => item.message_id === messageId ? next : item) : [...current, next];
+    });
+  }
+
+  async function toggleGlobalMessagePin(messageId) {
+    const { data, error: pinError } = await supabase.rpc("toggle_message_pin", { target_message_id: messageId });
+    if (pinError) { setError(pinError.message); return; }
+    setMessages((current) => current.map((item) => item.id === messageId ? {
+      ...item,
+      pinned_at: data ? new Date().toISOString() : null,
+      pinned_by: data ? session.user.id : null,
+    } : item));
+  }
+
+  async function hideMessageForMe(item) {
+    if (!window.confirm(l("Ștergi acest mesaj doar pentru tine? Ceilalți membri îl vor vedea în continuare.", "Delete this message only for you? Other members will still see it.", "Supprimer ce message uniquement pour vous ? Les autres membres le verront toujours.", "¿Eliminar este mensaje solo para ti? Los demás miembros seguirán viéndolo."))) return;
+    const { data, error: hideError } = await supabase.rpc("hide_message_for_me", { target_message_id: item.id });
+    if (hideError) { setError(hideError.message); return; }
+    setMessagePreferences((current) => {
+      const existing = current.find((entry) => entry.message_id === item.id);
+      const next = { message_id: item.id, pinned_at: existing?.pinned_at || null, hidden_at: data || new Date().toISOString() };
+      return existing ? current.map((entry) => entry.message_id === item.id ? next : entry) : [...current, next];
+    });
+    if (replyTo?.id === item.id) setReplyTo(null);
   }
 
   async function loadReadMarkers() {
@@ -1021,7 +1057,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     setFeedbackBusy(true); setFeedbackNotice("");
     const { error: feedbackError } = await supabase.rpc("submit_app_feedback", {
       feedback_message: feedbackText.trim(),
-      feedback_context: { room_id: roomId, version: "1.19.0", language, user_agent: navigator.userAgent },
+      feedback_context: { room_id: roomId, version: "1.19.2", language, user_agent: navigator.userAgent },
     });
     if (feedbackError) setFeedbackNotice(feedbackError.message);
     else {
@@ -1596,17 +1632,17 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
               </button>)}
             </div>}
           </div>}
-          {messages.length === 0 && !error && <p className="status">{l("Trimite primul mesaj.", "Send the first message.")}</p>}
-          {messages.length > 0 && displayedMessages.length === 0 && <p className="status">{l("Nu există mesaje care corespund filtrului.", "No messages match this filter.", "Aucun message ne correspond à ce filtre.", "Ningún mensaje coincide con este filtro.")}</p>}
+          {visibleMessages.length === 0 && !error && <p className="status">{messages.length ? l("Nu mai există mesaje vizibile pentru tine.", "There are no messages visible to you.", "Il n’y a plus de messages visibles pour vous.", "Ya no hay mensajes visibles para ti.") : l("Trimite primul mesaj.", "Send the first message.")}</p>}
+          {visibleMessages.length > 0 && displayedMessages.length === 0 && <p className="status">{l("Nu există mesaje care corespund filtrului.", "No messages match this filter.", "Aucun message ne correspond à ce filtre.", "Ningún mensaje coincide con este filtro.")}</p>}
           {displayedMessages.map((item,index) => { const mine = item.user_id === session.user.id; const replied = messages.find((x) => x.id === item.reply_to_id); const itemReactions = groupedReactions(item.id); const receipt = receiptForMessage(item); const showDay = index===0 || new Date(displayedMessages[index-1].created_at).toDateString()!==new Date(item.created_at).toDateString(); return <Fragment key={item.id}>
             {showDay && <div className="dayDivider" role="separator"><span>{dayLabel(item.created_at,language)}</span></div>}
             {item.id===unreadBoundaryId && <div className="unreadDivider" role="separator"><span>{l("Mesaje noi", "New messages")}</span></div>}
             <div ref={(node) => { messageRefs.current[item.id] = node; }} className={`messageWrap ${mine ? "mine" : ""}`}>
-            <div className={`bubble ${mine ? "mine" : ""} ${item.attachment_path ? "hasImage" : ""} ${item.pinned_at ? "pinnedMessage" : ""} ${item.deleted_at ? "deletedMessage" : ""}`}>
+            <div className={`bubble ${mine ? "mine" : ""} ${item.attachment_path ? "hasImage" : ""} ${isMessagePinned(item) ? "pinnedMessage" : ""} ${item.deleted_at ? "deletedMessage" : ""}`}>
               {item.deleted_at ? <p className="deletedText">{l("Mesaj șters", "Deleted message")}</p> : <>
                 {!mine && <strong className="sender">{displayNameForUser(item.user_id, item.sender_email)}</strong>}
                 {item.forwarded_from_message_id && <span className="forwardedMark"><Icon name="forward" size={13}/>{l("Redirecționat", "Forwarded", "Transféré", "Reenviado")} · {item.forwarded_from_sender}</span>}
-                {item.pinned_at && <span className="pinMark"><Icon name="pin" size={14}/></span>}
+                {isMessagePinned(item) && <span className="pinMark"><Icon name="pin" size={14}/></span>}
                 {item.reply_to_id && <button className="replyQuote" onClick={() => scrollToMessage(item.reply_to_id)}>
                   <strong>{replied ? displayNameForUser(replied.user_id, replied.sender_email) : l("Mesaj anterior", "Previous message")}</strong><span>{replied?.deleted_at ? l("Mesaj șters", "Deleted message") : replied?.body || replied?.attachment_name || (replied?.attachment_path ? l("Fișier atașat", "Attached file", "Fichier joint", "Archivo adjunto") : l("Mesaj indisponibil", "Message unavailable"))}</span>
                   {!replied?.deleted_at && replied?.attachment_path && (replied.attachment_type || "").startsWith("image/") && imageUrls[replied.attachment_path] && <img draggable={room.protected_content ? false : undefined} src={imageUrls[replied.attachment_path]} alt={l("Imagine citată", "Quoted image")} />}
@@ -1616,10 +1652,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
                 {item.body && <p><LinkifiedText text={item.body} /></p>}
               </>}<small className="messageMeta">{time(item.created_at, language)} {mine && <button type="button" className={receipt.seen.length ? "readReceipt seen" : "readReceipt"} onClick={() => openReceipts(item)} aria-label={l("Informații de citire", "Read information", "Informations de lecture", "Información de lectura")}>{receipt.seen.length ? "✓✓" : "✓"}</button>}</small>
             </div>
-            {!item.deleted_at && <div className="messageActions"><button onClick={() => setReplyTo(item)}><Icon name="reply" size={15}/>{l("Răspunde", "Reply")}</button><button onClick={() => openForward(item)}><Icon name="forward" size={15}/>{l("Redirecționează", "Forward", "Transférer", "Reenviar")}</button><button onClick={() => setReactionTarget(reactionTarget === item.id ? null : item.id)}><Icon name="smile" size={15}/>{l("Reacție", "React")}</button><button onClick={() => openReceipts(item)}><Icon name="info" size={15}/>{l("Info", "Info", "Infos", "Info")}</button>
-              {room.my_is_admin && <button onClick={() => toggleMessagePin(item.id)}><Icon name="pin" size={15}/>{item.pinned_at ? l("Anulează pin", "Unpin") : "Pin"}</button>}
-              {(mine || room.my_is_admin) && <button className="deleteMessageBtn" disabled={deletingMessageId === item.id} onClick={() => deleteMessage(item)}><Icon name="trash" size={15}/>{deletingMessageId === item.id ? l("Se șterge...", "Deleting...") : l("Șterge", "Delete")}</button>}</div>}
-            {!item.deleted_at && reactionTarget === item.id && <div className="reactionPicker" role="group" aria-label={l("Alege reacția", "Choose reaction")}>{REACTION_EMOJIS.map((emoji) => <button aria-label={l(`Reacție ${emoji}`, `React ${emoji}`, `Réagir avec ${emoji}`, `Reaccionar con ${emoji}`)} key={emoji} onClick={() => reactToMessage(item.id, emoji)}>{emoji}</button>)}</div>}
+            {!item.deleted_at && <button type="button" className="messageMenuTrigger" onClick={() => setActionMessage(item)} aria-label={l("Acțiuni pentru mesaj", "Message actions", "Actions du message", "Acciones del mensaje")} title={l("Acțiuni", "Actions", "Actions", "Acciones")}><span aria-hidden="true">•••</span></button>}
             {!item.deleted_at && Object.keys(itemReactions).length > 0 && <div className="reactionSummary">{Object.entries(itemReactions).map(([emoji, info]) => <button aria-label={l(`${info.count} reacții ${emoji}`, `${info.count} ${emoji} reactions`, `${info.count} réactions ${emoji}`, `${info.count} reacciones ${emoji}`)} className={info.mine ? "mine" : ""} key={emoji} onClick={() => reactToMessage(item.id, emoji)}>{emoji} {info.count}</button>)}</div>}
           </div></Fragment>; })}<div ref={bottom} />
         </div>
@@ -1643,6 +1676,19 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     {viewerMessage && imageUrls[viewerMessage.attachment_path] && <div className="mediaViewerBackdrop" onMouseDown={() => setViewerMessage(null)}><section className="mediaViewer" role="dialog" aria-modal="true" aria-label={l("Vizualizator imagine", "Image viewer", "Visionneuse d’image", "Visor de imágenes")} onMouseDown={(event) => event.stopPropagation()}>
       <div className="mediaViewerToolbar"><span>{viewerMessage.attachment_name || l("Imagine", "Image", "Image", "Imagen")}</span><div><small>{l("Apropie două degete pentru zoom · trage pentru deplasare", "Pinch to zoom · drag to pan", "Pincez pour zoomer · faites glisser pour déplacer", "Pellizca para ampliar · arrastra para mover")}</small><strong>{Math.round(viewerZoom*100)}%</strong><button onClick={() => setViewerMessage(null)} aria-label={l("Închide", "Close", "Fermer", "Cerrar")}>×</button></div></div>
       <div className={`mediaViewerCanvas ${room?.protected_content ? "protected" : ""}`} onPointerDown={viewerPointerDown} onPointerMove={viewerPointerMove} onPointerUp={viewerPointerUp} onPointerCancel={viewerPointerUp} onContextMenu={room?.protected_content ? (event) => event.preventDefault() : undefined}><img draggable={false} style={{ transform: `translate3d(${viewerPan.x}px,${viewerPan.y}px,0) scale(${viewerZoom})` }} src={imageUrls[viewerMessage.attachment_path]} alt={viewerMessage.attachment_name || l("Imagine", "Image")} />{room?.protected_content && <span className="viewerWatermark">{protectedWatermark}</span>}</div>
+    </section></div>}
+    {actionMessage && !actionMessage.deleted_at && <div className="messageActionBackdrop" onMouseDown={() => setActionMessage(null)}><section className="messageActionSheet" role="dialog" aria-modal="true" aria-label={l("Acțiuni pentru mesaj", "Message actions", "Actions du message", "Acciones del mensaje")} onMouseDown={(event) => event.stopPropagation()}>
+      <div className="quickReactions" role="group" aria-label={l("Reacții rapide", "Quick reactions", "Réactions rapides", "Reacciones rápidas")}>{REACTION_EMOJIS.map((emoji) => <button type="button" aria-label={l(`Reacție ${emoji}`, `React ${emoji}`, `Réagir avec ${emoji}`, `Reaccionar con ${emoji}`)} key={emoji} onClick={() => { reactToMessage(actionMessage.id, emoji); setActionMessage(null); }}>{emoji}</button>)}</div>
+      <div className="messageActionList">
+        <button type="button" onClick={() => { setReplyTo(actionMessage); setActionMessage(null); }}><Icon name="reply" size={19}/><span>{l("Răspunde", "Reply", "Répondre", "Responder")}</span></button>
+        <button type="button" onClick={() => { const selected = actionMessage; setActionMessage(null); openForward(selected); }}><Icon name="forward" size={19}/><span>{l("Redirecționează", "Forward", "Transférer", "Reenviar")}</span></button>
+        <button type="button" onClick={() => { const selected = actionMessage; setActionMessage(null); openReceipts(selected); }}><Icon name="info" size={19}/><span>{l("Informații", "Information", "Informations", "Información")}</span></button>
+        <button type="button" onClick={() => { togglePersonalMessagePin(actionMessage.id); setActionMessage(null); }}><Icon name="pin" size={19}/><span>{preferenceForMessage(actionMessage.id)?.pinned_at ? l("Scoate din fixatele mele", "Unpin for me", "Désépingler pour moi", "Desfijar para mí") : l("Fixează pentru mine", "Pin for me", "Épingler pour moi", "Fijar para mí")}</span></button>
+        <button type="button" onClick={() => { toggleGlobalMessagePin(actionMessage.id); setActionMessage(null); }}><Icon name="pin" size={19}/><span>{actionMessage.pinned_at ? l("Scoate din fixatele tuturor", "Unpin for everyone", "Désépingler pour tous", "Desfijar para todos") : l("Fixează pentru toți", "Pin for everyone", "Épingler pour tous", "Fijar para todos")}</span></button>
+        <button type="button" className="dangerAction" onClick={() => { const selected = actionMessage; setActionMessage(null); hideMessageForMe(selected); }}><Icon name="trash" size={19}/><span>{l("Șterge pentru mine", "Delete for me", "Supprimer pour moi", "Eliminar para mí")}</span></button>
+        {actionMessage.user_id === session.user.id && <button type="button" className="dangerAction" disabled={deletingMessageId === actionMessage.id} onClick={() => { const selected = actionMessage; setActionMessage(null); deleteMessage(selected); }}><Icon name="trash" size={19}/><span>{l("Șterge pentru toți", "Delete for everyone", "Supprimer pour tous", "Eliminar para todos")}</span></button>}
+      </div>
+      <button type="button" className="messageActionCancel" onClick={() => setActionMessage(null)}>{l("Închide", "Close", "Fermer", "Cerrar")}</button>
     </section></div>}
     {forwardMessage && <div className="modalBackdrop" onMouseDown={() => !forwardBusy && setForwardMessage(null)}><section className="modal passwordModal" role="dialog" aria-modal="true" aria-labelledby="forward-title" onMouseDown={(event) => event.stopPropagation()}><div className="modalTitle"><div><p className="eyebrow">eClinTalk</p><h2 id="forward-title">{l("Redirecționează", "Forward", "Transférer", "Reenviar")}</h2></div><button className="iconBtn" disabled={forwardBusy} onClick={() => setForwardMessage(null)}>×</button></div><form className="form" onSubmit={confirmForward}><p className="muted">{forwardMessage.body || forwardMessage.attachment_name || l("Mesaj cu atașament", "Message with attachment", "Message avec pièce jointe", "Mensaje con archivo adjunto")}</p><label>{l("Grupul destinație", "Destination group", "Groupe de destination", "Grupo de destino")}<select required value={forwardTargetId} onChange={(event) => setForwardTargetId(event.target.value)}><option value="">{l("Alege un grup", "Choose a group", "Choisir un groupe", "Elige un grupo")}</option>{forwardTargets.map((target) => <option value={target.id} key={target.id}>{target.protected_content ? "🛡 " : ""}{target.title} · {target.community_name || t("groupWithoutCommunity")}</option>)}</select></label>{room?.protected_content && <p className="protectedContentNotice">🛡 {l("Acest mesaj poate fi redirecționat numai către un alt grup cu Conținut protejat activ.", "This message can only be forwarded to another group with Protected content enabled.", "Ce message ne peut être transféré que vers un autre groupe protégé.", "Este mensaje solo puede reenviarse a otro grupo protegido.")}</p>}{!forwardTargets.length && <p className="error">{l("Nu există niciun grup eligibil pentru redirecționare.", "There is no eligible group for forwarding.", "Aucun groupe n’est disponible pour le transfert.", "No hay ningún grupo disponible para reenviar.")}</p>}<div className="modalActions"><button type="button" disabled={forwardBusy} onClick={() => setForwardMessage(null)}>{t("cancel")}</button><button className="primary" disabled={forwardBusy || !forwardTargetId}>{forwardBusy ? l("Se redirecționează...", "Forwarding...", "Transfert…", "Reenviando…") : l("Redirecționează", "Forward", "Transférer", "Reenviar")}</button></div></form></section></div>}
     {receiptMessage && (() => { const details=receiptForMessage(receiptMessage); return <div className="modalBackdrop" onMouseDown={() => setReceiptMessage(null)}><section className="modal receiptModal" role="dialog" aria-modal="true" aria-labelledby="receipt-title" onMouseDown={(event) => event.stopPropagation()}><div className="modalTitle"><div><p className="eyebrow">{l("Mesaj", "Message", "Message", "Mensaje")}</p><h2 id="receipt-title">{l("Informații de citire", "Read information", "Informations de lecture", "Información de lectura")}</h2></div><button className="iconBtn" onClick={() => setReceiptMessage(null)}>×</button></div><div className="receiptSection"><h3>✓✓ {l("Văzut de", "Seen by", "Vu par", "Visto por")} <small>{details.seen.length}</small></h3>{details.seen.length ? details.seen.map((marker) => <div className="receiptPerson" key={marker.user_id}><span className="memberAvatar">{(marker.display_name || marker.email).slice(0,2).toUpperCase()}</span><div><strong>{marker.display_name || marker.email}</strong><small>{new Date(marker.last_read_at).toLocaleString(LANGUAGE_LOCALES[language])}</small></div></div>) : <p className="muted">{l("Niciun destinatar nu a văzut încă mesajul.", "No recipient has seen the message yet.", "Aucun destinataire n’a encore vu le message.", "Ningún destinatario ha visto aún el mensaje.")}</p>}</div><div className="receiptSection"><h3>○ {l("Nevăzut de", "Not seen by", "Non vu par", "No visto por")} <small>{details.unseen.length}</small></h3>{details.unseen.map((marker) => <div className="receiptPerson" key={marker.user_id}><span className="memberAvatar">{(marker.display_name || marker.email).slice(0,2).toUpperCase()}</span><div><strong>{marker.display_name || marker.email}</strong><small>{marker.email}</small></div></div>)}</div></section></div>; })()}

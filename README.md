@@ -1,4 +1,10 @@
-# eClinTalk v1.19.1
+# eClinTalk v1.19.2
+
+Versiunea v1.19.2 simplifica actiunile mesajelor. Butoanele afisate permanent sub fiecare mesaj sunt inlocuite de un singur buton discret cu trei puncte. Acesta deschide un meniu profesional cu reactii rapide, Raspunde, Redirectioneaza, Informatii si actiuni de stergere, adaptat pentru telefon, tableta si calculator.
+
+Orice membru poate folosi separat **Fixeaza pentru mine**, **Fixeaza pentru toti** si **Sterge pentru mine**. Optiunea **Sterge pentru toti** este disponibila exclusiv persoanei care a scris mesajul, inclusiv atunci cand administratorul grupului este altcineva. Pentru activarea acestor reguli, ruleaza integral o singura data `supabase-message-preferences-v1.19.2.sql` in Supabase SQL Editor.
+
+## Versiunea v1.19.1
 
 Versiunea v1.19.1 adauga gesturi naturale pe telefon: zoom prin apropierea sau departarea a doua degete, deplasarea imaginii marite prin tragere si deschiderea listei conversatiilor prin glisare din marginea stanga spre dreapta. Grupurile cu mesaje necitite afiseaza numarul imediat dupa titlu, iar titlul este evidentiat cromatic. Actualizarea nu necesita un script SQL nou dupa instalarea v1.19.0.
 
