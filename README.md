@@ -1,4 +1,24 @@
-# eClinTalk v1.19.2
+# eClinTalk v1.20.2
+
+Versiunea v1.20.2 adauga in vizualizatorul imaginilor o sageata discreta pentru distribuire si analiza externa. Meniul nativ al telefonului poate trimite imaginea catre WhatsApp sau catre alte aplicatii compatibile instalate. Sunt disponibile si scurtaturi pentru Google Lens, ChatGPT si Claude; cand transferul direct nu este acceptat, imaginea este descarcata pentru a fi atasata manual.
+
+Optiunile externe nu sunt afisate pentru grupurile cu **Continut protejat**, pentru a pastra restrictiile de distribuire. Actualizarea v1.20.2 nu necesita alt script SQL; daca v1.20.1 nu a fost instalata, trebuie rulat in continuare `supabase-member-history-v1.20.1.sql`.
+
+## Versiunea v1.20.1
+
+Versiunea v1.20.1 face navigarea comunitatilor mai fluida pe telefon: alegerea unei comunitati pastreaza meniul lateral deschis, iar grupurile si butonul **Membri si setari** apar imediat in lista compacta. Din profilul grupului, administratorii pot deschide direct **Setari grup** pentru a modifica numele, membrii si protectia.
+
+La adaugarea unui membru intr-un grup, administratorul alege explicit daca persoana vede **tot istoricul grupului** sau **numai mesajele trimise dupa inscriere**. Aceeasi regula se aplica invitatiilor si accesului acordat ulterior din comunitate. Varianta implicita este cea mai prudenta: numai mesajele noi. Regula este aplicata in baza de date, inclusiv mesajelor, reactiilor si atasamentelor vechi.
+
+Inainte de testare, ruleaza integral o singura data `supabase-member-history-v1.20.1.sql` in Supabase SQL Editor.
+
+## Versiunea v1.20.0
+
+Versiunea v1.20.0 transforma fereastra de informatii a grupului intr-un profil profesional. Antetul prezinta grupul si comunitatea, iar zona de securitate explica accesul, parola si nivelul de protectie. Membrii au roluri vizibile, imaginile se deschid direct in vizualizatorul eClinTalk, iar fisierele si linkurile au liste separate, cu autor si data.
+
+Pentru grupurile cu continut protejat sunt afisate explicit regulile privind salvarea imaginilor, watermark-ul cu identitatea utilizatorului si redirectionarea numai catre alte grupuri protejate. Interfata este adaptata pentru Mac, Windows, iPhone, Android si tablete. Aceasta actualizare nu necesita un script SQL nou.
+
+## Versiunea v1.19.2
 
 Versiunea v1.19.2 simplifica actiunile mesajelor. Controalele afisate permanent au fost eliminate complet, iar meniul profesional cu reactii rapide, Raspunde, Redirectioneaza, Informatii si actiuni de stergere se deschide direct prin gest, fara elemente suprapuse peste mesaj sau imagine.
 

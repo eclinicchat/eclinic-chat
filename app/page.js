@@ -39,7 +39,13 @@ function Icon({ name, size = 18 }) {
     send: <><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></>,
     trash: <><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13"/><path d="M10 11v5M14 11v5"/></>,
     users: <><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v2"/><path d="M16 4a3 3 0 0 1 0 6M17 13a5 5 0 0 1 4 5v2"/></>,
+    image: <><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 20"/></>,
+    file: <><path d="M6 2h8l4 4v16H6Z"/><path d="M14 2v5h5M9 12h6M9 16h6"/></>,
+    link: <><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.2-1.2"/></>,
+    shield: <path d="M12 3 20 6v5c0 5-3.4 8.2-8 10-4.6-1.8-8-5-8-10V6Z"/>,
+    lock: <><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></>,
     menu: <path d="M4 7h16M4 12h16M4 17h16"/>,
+    share: <><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/></>,
     chevronDown: <path d="m7 9 5 5 5-5"/>,
     close: <path d="m6 6 12 12M18 6 6 18"/>,
   };
@@ -378,11 +384,13 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   const [communityNotice, setCommunityNotice] = useState("");
   const [communityInviteScope, setCommunityInviteScope] = useState("community");
   const [communityInviteGroups, setCommunityInviteGroups] = useState([]);
+  const [communityHistoryAccess, setCommunityHistoryAccess] = useState("new");
   const [communityInviteLinks, setCommunityInviteLinks] = useState([]);
   const [invitationLanguage, setInvitationLanguage] = useState(language);
   const [memberGroupEditorId, setMemberGroupEditorId] = useState(null);
   const [memberGroupOptions, setMemberGroupOptions] = useState([]);
   const [memberGroupSelection, setMemberGroupSelection] = useState([]);
+  const [memberGroupHistoryAccess, setMemberGroupHistoryAccess] = useState("new");
   const [inviteStatus, setInviteStatus] = useState("");
   const [roomId, setRoomId] = useState(null);
   const [unlockedRoomId, setUnlockedRoomId] = useState(null);
@@ -411,6 +419,9 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   const [viewerZoom, setViewerZoom] = useState(1);
   const [viewerPan, setViewerPan] = useState({ x: 0, y: 0 });
   const [viewerDismissY, setViewerDismissY] = useState(0);
+  const [viewerShareOpen, setViewerShareOpen] = useState(false);
+  const [viewerShareBusy, setViewerShareBusy] = useState(false);
+  const [viewerShareNotice, setViewerShareNotice] = useState("");
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackBusy, setFeedbackBusy] = useState(false);
@@ -428,6 +439,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   const [members, setMembers] = useState([]);
   const [settingsTitle, setSettingsTitle] = useState("");
   const [newMemberEmails, setNewMemberEmails] = useState("");
+  const [newMemberHistoryAccess, setNewMemberHistoryAccess] = useState("new");
   const [settingsBusy, setSettingsBusy] = useState(false);
   const [settingsError, setSettingsError] = useState("");
   const [passwordOpen, setPasswordOpen] = useState(false);
@@ -512,7 +524,6 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   function chooseCommunity(id) {
     setSelectedCommunityId(id);
     setRoomId(null);
-    setMobileMenuOpen(false);
   }
 
   function chooseRoom(id) {
@@ -525,6 +536,8 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     setViewerZoom(1);
     setViewerPan({ x: 0, y: 0 });
     setViewerDismissY(0);
+    setViewerShareOpen(false);
+    setViewerShareNotice("");
     viewerPointers.current.clear();
     viewerGesture.current = { distance: 0, zoom: 1, startX: 0, startY: 0, panX: 0, panY: 0, dismissY: 0 };
     if (!viewerHistoryActive.current) {
@@ -535,8 +548,64 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   }
 
   function closeImageViewer() {
+    setViewerShareOpen(false);
+    setViewerShareNotice("");
     if (viewerHistoryActive.current) window.history.back();
     else setViewerMessage(null);
+  }
+
+  async function getViewerImageFile() {
+    if (!viewerMessage?.attachment_path) throw new Error(l("Imaginea nu este disponibilă.", "The image is not available.", "L’image n’est pas disponible.", "La imagen no está disponible."));
+    const { data, error: downloadError } = await supabase.storage.from("chat-images").download(viewerMessage.attachment_path);
+    if (downloadError || !data) throw new Error(downloadError?.message || l("Imaginea nu a putut fi pregătită.", "The image could not be prepared."));
+    const extension = (viewerMessage.attachment_type || data.type || "image/jpeg").split("/")[1]?.replace("jpeg","jpg") || "jpg";
+    const rawName = viewerMessage.attachment_name || `eClinTalk-${Date.now()}.${extension}`;
+    const safeName = rawName.replace(/[^a-zA-Z0-9._-]+/g,"-");
+    return new File([data], safeName, { type: viewerMessage.attachment_type || data.type || "image/jpeg" });
+  }
+
+  function saveViewerFile(file) {
+    const url = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = url; link.download = file.name; link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url),1500);
+  }
+
+  async function shareViewerImage() {
+    if (room?.protected_content || viewerShareBusy) return;
+    setViewerShareBusy(true); setViewerShareNotice("");
+    try {
+      const file = await getViewerImageFile();
+      if (navigator.share && (!navigator.canShare || navigator.canShare({ files:[file] }))) {
+        await navigator.share({ files:[file], title:viewerMessage.attachment_name || "eClinTalk" });
+        setViewerShareOpen(false);
+      } else {
+        saveViewerFile(file);
+        setViewerShareNotice(l("Imaginea a fost descărcată. O poți trimite din aplicația dorită.", "The image was downloaded. You can send it from your preferred app.", "L’image a été téléchargée. Vous pouvez l’envoyer depuis l’application souhaitée.", "La imagen se descargó. Puedes enviarla desde la aplicación que prefieras."));
+      }
+    } catch (shareError) {
+      if (shareError?.name !== "AbortError") setViewerShareNotice(shareError?.message || l("Distribuirea nu este disponibilă.", "Sharing is unavailable."));
+    }
+    setViewerShareBusy(false);
+  }
+
+  async function openExternalImageTool(target) {
+    if (room?.protected_content || viewerShareBusy) return;
+    const destinations = { web:"https://lens.google.com/", chatgpt:"https://chatgpt.com/", claude:"https://claude.ai/new" };
+    const externalWindow = window.open("about:blank","_blank");
+    if (externalWindow) externalWindow.opener = null;
+    setViewerShareBusy(true); setViewerShareNotice("");
+    try {
+      const file = await getViewerImageFile();
+      saveViewerFile(file);
+      if (externalWindow) externalWindow.location.href = destinations[target];
+      else window.open(destinations[target],"_blank","noopener,noreferrer");
+      setViewerShareNotice(l("Imaginea a fost descărcată. Atașeaz-o în pagina deschisă.", "The image was downloaded. Attach it in the page that opened.", "L’image a été téléchargée. Joignez-la dans la page ouverte.", "La imagen se descargó. Adjúntala en la página abierta."));
+    } catch (toolError) {
+      externalWindow?.close();
+      setViewerShareNotice(toolError?.message || l("Imaginea nu a putut fi pregătită.", "The image could not be prepared."));
+    }
+    setViewerShareBusy(false);
   }
 
   function viewerPointerDown(event) {
@@ -695,6 +764,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
       viewerHistoryActive.current = false;
       setViewerMessage(null);
       setViewerDismissY(0);
+      setViewerShareOpen(false);
     }
     window.addEventListener("popstate", handleViewerBack);
     return () => window.removeEventListener("popstate", handleViewerBack);
@@ -708,6 +778,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     function closeWithEscape(event) {
       if (event.key !== "Escape" || logoutWarning) return;
       if (passwordOpen && !passwordBusy) cancelPassword();
+      else if (viewerShareOpen) setViewerShareOpen(false);
       else if (viewerMessage) closeImageViewer();
       else if (receiptMessage) setReceiptMessage(null);
       else if (forwardMessage && !forwardBusy) setForwardMessage(null);
@@ -727,7 +798,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     }
     document.addEventListener("keydown", closeWithEscape);
     return () => document.removeEventListener("keydown", closeWithEscape);
-  }, [logoutWarning, passwordOpen, passwordBusy, viewerMessage, receiptMessage, forwardMessage, forwardBusy, feedbackOpen, feedbackBusy, settingsOpen, settingsBusy, groupInfoOpen, communitySettingsOpen, communityBusy, profileOpen, profileBusy, modal, communityModal, emojiOpen, actionMessage, actionRoom, reactionTarget, pinnedOpen, mobileMenuOpen]);
+  }, [logoutWarning, passwordOpen, passwordBusy, viewerShareOpen, viewerMessage, receiptMessage, forwardMessage, forwardBusy, feedbackOpen, feedbackBusy, settingsOpen, settingsBusy, groupInfoOpen, communitySettingsOpen, communityBusy, profileOpen, profileBusy, modal, communityModal, emojiOpen, actionMessage, actionRoom, reactionTarget, pinnedOpen, mobileMenuOpen]);
 
   useEffect(() => {
     const previous = previousRoomId.current;
@@ -1133,7 +1204,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     setFeedbackBusy(true); setFeedbackNotice("");
     const { error: feedbackError } = await supabase.rpc("submit_app_feedback", {
       feedback_message: feedbackText.trim(),
-      feedback_context: { room_id: roomId, version: "1.19.2", language, user_agent: navigator.userAgent },
+      feedback_context: { room_id: roomId, version: "1.20.2", language, user_agent: navigator.userAgent },
     });
     if (feedbackError) setFeedbackNotice(feedbackError.message);
     else {
@@ -1233,6 +1304,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     setCommunityDescription(selectedCommunity.description || "");
     setCommunityMemberEmails(""); setCommunityMembers([]); setCommunityError(""); setCommunityNotice("");
     setCommunityInviteScope("community"); setCommunityInviteGroups([]); setCommunityInviteLinks([]);
+    setCommunityHistoryAccess("new");
     setMemberGroupEditorId(null); setMemberGroupOptions([]); setMemberGroupSelection([]);
     setCommunitySettingsOpen(true);
     await loadCommunityMembers();
@@ -1255,6 +1327,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
       setMemberGroupEditorId(member.user_id);
       setMemberGroupOptions(options);
       setMemberGroupSelection(options.filter((item) => item.is_member).map((item) => item.conversation_id));
+      setMemberGroupHistoryAccess("new");
     }
     setCommunityBusy(false);
   }
@@ -1268,6 +1341,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
       target_community_id: selectedCommunity.id,
       target_user_id: member.user_id,
       target_conversation_ids: selectedIds,
+      include_message_history: memberGroupHistoryAccess === "all",
     });
     if (accessError) setCommunityError(accessError.message);
     else {
@@ -1315,6 +1389,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
         target_community_id: selectedCommunity.id,
         invitee_email: inviteeEmail,
         target_conversation_ids: targetGroupIds,
+        include_message_history: communityHistoryAccess === "all",
       });
       if (invitationError) { addError = invitationError; break; }
       if (data?.[0]) results.push(data[0]);
@@ -1425,6 +1500,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     }
     setSettingsTitle(room?.title || "");
     setNewMemberEmails("");
+    setNewMemberHistoryAccess("new");
     setGroupPassword("");
     setProtectedContent(Boolean(room?.protected_content));
     setMembers([]);
@@ -1579,11 +1655,14 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     if (!emails.length || settingsBusy) return;
     setSettingsBusy(true); setSettingsError("");
     const { error: addError } = await supabase.rpc("add_conversation_members", {
-      target_conversation_id: roomId, member_emails: emails,
+      target_conversation_id: roomId,
+      member_emails: emails,
+      include_message_history: newMemberHistoryAccess === "all",
     });
     if (addError) setSettingsError(addError.message);
     else {
       setNewMemberEmails("");
+      setNewMemberHistoryAccess("new");
       await Promise.all([loadMembers(), loadRooms(roomId)]);
     }
     setSettingsBusy(false);
@@ -1754,7 +1833,16 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
 	          {!visibleRooms.length && canCreateGroup && <button className="primary" onClick={() => setModal(true)}>{t("firstGroup")}</button>}{error && <p className="chatError" role="alert">{error}</p>}</div></>}
     </section>
     {viewerMessage && imageUrls[viewerMessage.attachment_path] && <div className="mediaViewerBackdrop" onMouseDown={closeImageViewer}><section className="mediaViewer" style={{ transform: `translateY(${viewerDismissY}px)`, opacity: Math.max(.35,1-viewerDismissY/500) }} role="dialog" aria-modal="true" aria-label={l("Vizualizator imagine", "Image viewer", "Visionneuse d’image", "Visor de imágenes")} onMouseDown={(event) => event.stopPropagation()}>
-      <div className="mediaViewerToolbar"><span>{viewerMessage.attachment_name || l("Imagine", "Image", "Image", "Imagen")}</span><div><small>{l("Zoom cu două degete · glisează în jos pentru închidere", "Pinch to zoom · swipe down to close", "Pincez pour zoomer · glissez vers le bas pour fermer", "Pellizca para ampliar · desliza hacia abajo para cerrar")}</small><strong>{Math.round(viewerZoom*100)}%</strong></div></div>
+      <div className="mediaViewerToolbar"><span>{viewerMessage.attachment_name || l("Imagine", "Image", "Image", "Imagen")}</span><div><small>{l("Zoom cu două degete · glisează în jos pentru închidere", "Pinch to zoom · swipe down to close", "Pincez pour zoomer · glissez vers le bas pour fermer", "Pellizca para ampliar · desliza hacia abajo para cerrar")}</small><strong>{Math.round(viewerZoom*100)}%</strong>{!room?.protected_content && <button type="button" className="viewerShareButton" aria-label={l("Distribuie sau caută imaginea", "Share or search image", "Partager ou rechercher l’image", "Compartir o buscar imagen")} aria-expanded={viewerShareOpen} onClick={() => { setViewerShareNotice(""); setViewerShareOpen((current) => !current); }}><Icon name="share" size={19}/></button>}</div></div>
+      {viewerShareOpen && !room?.protected_content && <div className="viewerShareMenu" role="dialog" aria-label={l("Opțiuni pentru imagine", "Image options", "Options de l’image", "Opciones de imagen")} onMouseDown={(event) => event.stopPropagation()}>
+        <div className="viewerShareTitle"><div><strong>{l("Distribuie imaginea", "Share image", "Partager l’image", "Compartir imagen")}</strong><small>{l("Alege destinația", "Choose a destination", "Choisissez une destination", "Elige un destino")}</small></div><button type="button" onClick={() => setViewerShareOpen(false)} aria-label={l("Închide", "Close", "Fermer", "Cerrar")}><Icon name="close" size={17}/></button></div>
+        <button type="button" disabled={viewerShareBusy} onClick={shareViewerImage}><Icon name="share" size={19}/><span><strong>{l("WhatsApp sau altă aplicație", "WhatsApp or another app", "WhatsApp ou une autre application", "WhatsApp u otra aplicación")}</strong><small>{l("Folosește meniul dispozitivului", "Use the device share menu", "Utilise le menu de partage de l’appareil", "Usa el menú para compartir del dispositivo")}</small></span></button>
+        <button type="button" disabled={viewerShareBusy} onClick={() => openExternalImageTool("web")}><Icon name="search" size={19}/><span><strong>{l("Caută imaginea pe web", "Search image on the web", "Rechercher l’image sur le web", "Buscar imagen en la web")}</strong><small>Google Lens</small></span></button>
+        <button type="button" disabled={viewerShareBusy} onClick={() => openExternalImageTool("chatgpt")}><span className="viewerToolMark">C</span><span><strong>ChatGPT</strong><small>{l("Deschide și atașează imaginea", "Open and attach the image", "Ouvrir et joindre l’image", "Abrir y adjuntar la imagen")}</small></span></button>
+        <button type="button" disabled={viewerShareBusy} onClick={() => openExternalImageTool("claude")}><span className="viewerToolMark">A</span><span><strong>Claude</strong><small>{l("Deschide și atașează imaginea", "Open and attach the image", "Ouvrir et joindre l’image", "Abrir y adjuntar la imagen")}</small></span></button>
+        {viewerShareNotice && <p role="status">{viewerShareNotice}</p>}
+        <small className="viewerPrivacyNote">{l("Nu distribui date medicale sau personale fără o bază legală și acordurile necesare.", "Do not share medical or personal data without a lawful basis and the required approvals.", "Ne partagez pas de données médicales ou personnelles sans base légale et autorisations nécessaires.", "No compartas datos médicos o personales sin una base legal y las autorizaciones necesarias.")}</small>
+      </div>}
       <div className={`mediaViewerCanvas ${room?.protected_content ? "protected" : ""}`} onPointerDown={viewerPointerDown} onPointerMove={viewerPointerMove} onPointerUp={viewerPointerUp} onPointerCancel={viewerPointerUp} onContextMenu={room?.protected_content ? (event) => event.preventDefault() : undefined}><img draggable={false} style={{ transform: `translate3d(${viewerPan.x}px,${viewerPan.y}px,0) scale(${viewerZoom})` }} src={imageUrls[viewerMessage.attachment_path]} alt={viewerMessage.attachment_name || l("Imagine", "Image")} />{room?.protected_content && <span className="viewerWatermark">{protectedWatermark}</span>}</div>
     </section></div>}
     {actionMessage && !actionMessage.deleted_at && <div className="messageActionBackdrop" onMouseDown={() => setActionMessage(null)}><section className="messageActionSheet" role="dialog" aria-modal="true" aria-label={l("Acțiuni pentru mesaj", "Message actions", "Actions du message", "Acciones del mensaje")} onMouseDown={(event) => event.stopPropagation()}>
@@ -1776,22 +1864,27 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     {feedbackOpen && <div className="modalBackdrop" onMouseDown={() => !feedbackBusy && setFeedbackOpen(false)}><section className="modal passwordModal" role="dialog" aria-modal="true" aria-labelledby="feedback-title" onMouseDown={(event) => event.stopPropagation()}><div className="modalTitle"><div><p className="eyebrow">eClinTalk</p><h2 id="feedback-title">{l("Trimite feedback", "Send feedback", "Envoyer un avis", "Enviar comentarios")}</h2></div><button className="iconBtn" disabled={feedbackBusy} onClick={() => setFeedbackOpen(false)}>×</button></div><form className="form" onSubmit={submitFeedback}><label>{l("Descrie problema sau sugestia", "Describe the issue or suggestion", "Décrivez le problème ou la suggestion", "Describe el problema o la sugerencia")}<textarea rows={6} maxLength={2000} required value={feedbackText} onChange={(event) => setFeedbackText(event.target.value)} placeholder={l("Ce s-a întâmplat și pe ce dispozitiv?", "What happened and on which device?", "Que s’est-il passé et sur quel appareil ?", "¿Qué ocurrió y en qué dispositivo?")} /></label>{feedbackNotice && <p className={feedbackNotice.includes("Mulțumim") || feedbackNotice.includes("Thank") || feedbackNotice.includes("Merci") || feedbackNotice.includes("Gracias") ? "success" : "error"}>{feedbackNotice}</p>}<div className="modalActions"><button type="button" onClick={() => setFeedbackOpen(false)}>{t("cancel")}</button><button className="primary" disabled={feedbackBusy || feedbackText.trim().length<3}>{feedbackBusy ? l("Se trimite...", "Sending...", "Envoi…", "Enviando…") : l("Trimite feedback", "Send feedback", "Envoyer", "Enviar")}</button></div></form></section></div>}
     {modal && <NewConversation language={language} close={() => setModal(false)} communities={communities} selectedCommunityId={selectedCommunityId} isGeneralAdmin={isGeneralAdmin} created={(id) => { setModal(false); loadRooms(id); loadCommunities(); }} />}
     {communityModal && <NewCommunity language={language} close={() => setCommunityModal(false)} created={(id) => { setCommunityModal(false); loadCommunities(id); }} />}
-    {groupInfoOpen && room && <div className="modalBackdrop" onMouseDown={() => setGroupInfoOpen(false)}><section className="modal manageModal groupInfoModal" role="dialog" aria-modal="true" aria-labelledby="group-info-title" onMouseDown={(e) => e.stopPropagation()}>
-      <div className="modalTitle"><div><p className="eyebrow">{room.community_name || l("Grup independent", "Independent group", "Groupe indépendant", "Grupo independiente")}</p><h2 id="group-info-title">{room.title}</h2></div><button className="iconBtn" aria-label={l("Închide", "Close", "Fermer", "Cerrar")} onClick={() => setGroupInfoOpen(false)}>×</button></div>
-      <div className="groupInfoSummary"><span>{room.member_count} {t("members")}</span><span>{room.password_protected ? `🔒 ${l("Parolă activă", "Password enabled", "Mot de passe activé", "Contraseña activa")}` : `✓ ${l("Numai pentru membri", "Members only", "Membres uniquement", "Solo miembros")}`}</span>{room.protected_content && <span>🛡 {l("Conținut protejat", "Protected content", "Contenu protégé", "Contenido protegido")}</span>}</div>
+    {groupInfoOpen && room && <div className="modalBackdrop groupInfoBackdrop" onMouseDown={() => setGroupInfoOpen(false)}><section className="modal manageModal groupInfoModal" role="dialog" aria-modal="true" aria-labelledby="group-info-title" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="groupInfoHeader"><span className="groupInfoAvatar">{room.title.slice(0,2).toUpperCase()}</span><div><p className="eyebrow">{room.community_name || l("Grup independent", "Independent group", "Groupe indépendant", "Grupo independiente")}</p><h2 id="group-info-title">{room.title}</h2><small>{room.member_count} {t("members")} · {l("grup privat", "private group", "groupe privé", "grupo privado")}</small></div><button className="iconBtn" aria-label={l("Închide", "Close", "Fermer", "Cerrar")} onClick={() => setGroupInfoOpen(false)}>×</button></div>
+      <div className="groupSecurityGrid" aria-label={l("Securitatea grupului", "Group security", "Sécurité du groupe", "Seguridad del grupo")}>
+        <article><Icon name="users" size={19}/><span><strong>{l("Acces", "Access", "Accès", "Acceso")}</strong><small>{l("Numai membrii adăugați", "Added members only", "Membres ajoutés uniquement", "Solo miembros añadidos")}</small></span></article>
+        <article><Icon name="lock" size={19}/><span><strong>{l("Parolă", "Password", "Mot de passe", "Contraseña")}</strong><small>{room.password_protected ? l("Activă", "Enabled", "Activé", "Activada") : l("Nu este necesară", "Not required", "Non requis", "No requerida")}</small></span></article>
+        <article className={room.protected_content ? "protected" : ""}><Icon name="shield" size={19}/><span><strong>{l("Conținut", "Content", "Contenu", "Contenido")}</strong><small>{room.protected_content ? l("Protejat", "Protected", "Protégé", "Protegido") : l("Protecție standard", "Standard protection", "Protection standard", "Protección estándar")}</small></span></article>
+      </div>
+      <div className="groupPermissionLine"><span>{l("Rolul tău", "Your role", "Votre rôle", "Tu función")}: <strong>{isOwner ? l("Proprietar", "Owner", "Propriétaire", "Propietario") : isAdmin ? "Administrator" : l("Membru", "Member", "Membre", "Miembro")}</strong></span>{isAdmin && <button type="button" onClick={() => { setGroupInfoOpen(false); openSettings(); }}><Icon name="settings" size={15}/>{l("Setări grup", "Group settings", "Paramètres du groupe", "Ajustes del grupo")}</button>}</div>
       <div className="groupInfoTabs" role="tablist">
-        <button type="button" role="tab" aria-selected={groupInfoTab === "members"} className={groupInfoTab === "members" ? "active" : ""} onClick={() => setGroupInfoTab("members")}>{l("Membri", "Members", "Membres", "Miembros")} <small>{members.length}</small></button>
-        <button type="button" role="tab" aria-selected={groupInfoTab === "media"} className={groupInfoTab === "media" ? "active" : ""} onClick={() => setGroupInfoTab("media")}>{l("Media", "Media", "Médias", "Multimedia")} <small>{sharedMedia.length}</small></button>
-        <button type="button" role="tab" aria-selected={groupInfoTab === "files"} className={groupInfoTab === "files" ? "active" : ""} onClick={() => setGroupInfoTab("files")}>{l("Fișiere", "Files", "Fichiers", "Archivos")} <small>{sharedFiles.length}</small></button>
-        <button type="button" role="tab" aria-selected={groupInfoTab === "links"} className={groupInfoTab === "links" ? "active" : ""} onClick={() => setGroupInfoTab("links")}>{l("Linkuri", "Links", "Liens", "Enlaces")} <small>{sharedLinks.length}</small></button>
+        <button type="button" role="tab" aria-selected={groupInfoTab === "members"} className={groupInfoTab === "members" ? "active" : ""} onClick={() => setGroupInfoTab("members")}><Icon name="users" size={16}/><span>{l("Membri", "Members", "Membres", "Miembros")}</span><small>{members.length}</small></button>
+        <button type="button" role="tab" aria-selected={groupInfoTab === "media"} className={groupInfoTab === "media" ? "active" : ""} onClick={() => setGroupInfoTab("media")}><Icon name="image" size={16}/><span>{l("Imagini", "Images", "Images", "Imágenes")}</span><small>{sharedMedia.length}</small></button>
+        <button type="button" role="tab" aria-selected={groupInfoTab === "files"} className={groupInfoTab === "files" ? "active" : ""} onClick={() => setGroupInfoTab("files")}><Icon name="file" size={16}/><span>{l("Fișiere", "Files", "Fichiers", "Archivos")}</span><small>{sharedFiles.length}</small></button>
+        <button type="button" role="tab" aria-selected={groupInfoTab === "links"} className={groupInfoTab === "links" ? "active" : ""} onClick={() => setGroupInfoTab("links")}><Icon name="link" size={16}/><span>{l("Linkuri", "Links", "Liens", "Enlaces")}</span><small>{sharedLinks.length}</small></button>
       </div>
       <div className="groupInfoContent" role="tabpanel">
-        {groupInfoTab === "members" && <div className="memberList">{members.map((member) => <div className="memberRow groupMemberInfo" key={member.user_id}><span className="memberAvatar">{(member.display_name || member.email).slice(0,2).toUpperCase()}</span><div><strong>{member.display_name || member.email}</strong><small>{member.email} · {member.is_owner ? l("Proprietar · Administrator", "Owner · Administrator", "Propriétaire · Administrateur", "Propietario · Administrador") : member.is_admin ? "Administrator" : l("Membru", "Member", "Membre", "Miembro")}</small></div></div>)}</div>}
-        {groupInfoTab === "media" && (sharedMedia.length ? <div className="mediaGallery">{sharedMedia.map((item) => imageUrls[item.attachment_path] && (room.protected_content ? <div className="protectedMedia galleryMedia" key={item.id} onContextMenu={(e) => e.preventDefault()}><img draggable="false" src={imageUrls[item.attachment_path]} alt={item.attachment_name || l("Imagine", "Image")} /><span className="mediaWatermark" aria-hidden="true">{protectedWatermark}</span></div> : <a className="galleryMedia" href={imageUrls[item.attachment_path]} target="_blank" rel="noreferrer" key={item.id}><img src={imageUrls[item.attachment_path]} alt={item.attachment_name || l("Imagine", "Image")} /></a>))}</div> : <p className="emptyInfo">{l("Nu au fost trimise imagini în acest grup.", "No images have been shared in this group.", "Aucune image n’a été partagée dans ce groupe.", "No se han compartido imágenes en este grupo.")}</p>)}
-        {groupInfoTab === "files" && (sharedFiles.length ? <div className="sharedItemList">{sharedFiles.map((item) => <a href={imageUrls[item.attachment_path] || "#"} target="_blank" rel="noreferrer" className="sharedFileRow" key={item.id}><span aria-hidden="true">📄</span><span><strong>{item.attachment_name || l("Fișier", "File")}</strong><small>{displayNameForUser(item.user_id,item.sender_email)} · {new Date(item.created_at).toLocaleDateString(LANGUAGE_LOCALES[language])}</small></span></a>)}</div> : <p className="emptyInfo">{l("Nu au fost trimise fișiere în acest grup.", "No files have been shared in this group.", "Aucun fichier n’a été partagé dans ce groupe.", "No se han compartido archivos en este grupo.")}</p>)}
-        {groupInfoTab === "links" && (sharedLinks.length ? <div className="sharedItemList">{sharedLinks.map((item,index) => <a href={item.url} target="_blank" rel="noreferrer" className="sharedLinkRow" key={`${item.messageId}-${index}`}><span aria-hidden="true">🔗</span><span><strong>{item.url}</strong><small>{item.sender} · {new Date(item.createdAt).toLocaleDateString(LANGUAGE_LOCALES[language])}</small></span></a>)}</div> : <p className="emptyInfo">{l("Nu au fost trimise linkuri în acest grup.", "No links have been shared in this group.", "Aucun lien n’a été partagé dans ce groupe.", "No se han compartido enlaces en este grupo.")}</p>)}
+        {groupInfoTab === "members" && <div className="memberList groupMemberList">{members.map((member) => <div className="memberRow groupMemberInfo" key={member.user_id}><span className="memberAvatar">{(member.display_name || member.email).slice(0,2).toUpperCase()}</span><div><strong>{member.display_name || member.email}{member.user_id === session.user.id && <em>{l("Tu", "You", "Vous", "Tú")}</em>}</strong><small>{member.email}</small></div><span className={`memberRole ${member.is_owner || member.is_admin ? "admin" : ""}`}>{member.is_owner ? l("Proprietar", "Owner", "Propriétaire", "Propietario") : member.is_admin ? "Administrator" : l("Membru", "Member", "Membre", "Miembro")}</span></div>)}</div>}
+        {groupInfoTab === "media" && (sharedMedia.length ? <div className="mediaGallery">{sharedMedia.map((item) => imageUrls[item.attachment_path] && <button type="button" className="galleryMediaCard" key={item.id} onContextMenu={room.protected_content ? (e) => e.preventDefault() : undefined} onClick={() => { setGroupInfoOpen(false); openImageViewer(item); }}><span className={`galleryMedia ${room.protected_content ? "protectedMedia" : ""}`}><img draggable={room.protected_content ? "false" : undefined} src={imageUrls[item.attachment_path]} alt={item.attachment_name || l("Imagine", "Image")} />{room.protected_content && <span className="mediaWatermark" aria-hidden="true">{protectedWatermark}</span>}</span><span className="galleryMeta"><strong>{displayNameForUser(item.user_id,item.sender_email)}</strong><small>{new Date(item.created_at).toLocaleDateString(LANGUAGE_LOCALES[language])}</small></span></button>)}</div> : <p className="emptyInfo"><Icon name="image" size={28}/><strong>{l("Nicio imagine", "No images", "Aucune image", "Sin imágenes")}</strong><span>{l("Imaginile trimise în grup vor apărea aici.", "Images shared in the group will appear here.", "Les images partagées apparaîtront ici.", "Las imágenes compartidas aparecerán aquí.")}</span></p>)}
+        {groupInfoTab === "files" && (sharedFiles.length ? <div className="sharedItemList">{sharedFiles.map((item) => <a href={imageUrls[item.attachment_path] || "#"} target="_blank" rel="noreferrer" className="sharedFileRow" key={item.id}><Icon name="file" size={20}/><span><strong>{item.attachment_name || l("Fișier", "File")}</strong><small>{displayNameForUser(item.user_id,item.sender_email)} · {new Date(item.created_at).toLocaleDateString(LANGUAGE_LOCALES[language])}{item.attachment_size ? ` · ${Math.max(1,Math.round(item.attachment_size/1024))} KB` : ""}</small></span></a>)}</div> : <p className="emptyInfo"><Icon name="file" size={28}/><strong>{l("Niciun fișier", "No files", "Aucun fichier", "Sin archivos")}</strong><span>{l("Fișierele trimise în grup vor apărea aici.", "Files shared in the group will appear here.", "Les fichiers partagés apparaîtront ici.", "Los archivos compartidos aparecerán aquí.")}</span></p>)}
+        {groupInfoTab === "links" && (sharedLinks.length ? <div className="sharedItemList">{sharedLinks.map((item,index) => <a href={item.url} target="_blank" rel="noreferrer" className="sharedLinkRow" key={`${item.messageId}-${index}`}><Icon name="link" size={20}/><span><strong>{item.url}</strong><small>{item.sender} · {new Date(item.createdAt).toLocaleDateString(LANGUAGE_LOCALES[language])}</small></span></a>)}</div> : <p className="emptyInfo"><Icon name="link" size={28}/><strong>{l("Niciun link", "No links", "Aucun lien", "Sin enlaces")}</strong><span>{l("Linkurile trimise în grup vor apărea aici.", "Links shared in the group will appear here.", "Les liens partagés apparaîtront ici.", "Los enlaces compartidos aparecerán aquí.")}</span></p>)}
       </div>
-      {room.protected_content && <p className="protectedContentNotice">🛡 {l("Salvarea obișnuită a imaginilor este restricționată, iar imaginile sunt marcate cu identitatea utilizatorului. Capturile realizate cu alt dispozitiv nu pot fi împiedicate complet.", "Standard image saving is restricted and images are marked with the viewer’s identity. Captures made with another device cannot be completely prevented.", "L’enregistrement habituel des images est limité et les images portent l’identité de l’utilisateur. Une capture réalisée avec un autre appareil ne peut pas être totalement empêchée.", "El guardado habitual de imágenes está restringido y las imágenes llevan la identidad del usuario. No se puede impedir por completo una captura realizada con otro dispositivo.")}</p>}
+      {room.protected_content && <div className="protectedContentDetails"><div><Icon name="shield" size={20}/><strong>{l("Reguli pentru conținutul protejat", "Protected content rules", "Règles du contenu protégé", "Reglas del contenido protegido")}</strong></div><ul><li>{l("Salvarea obișnuită a imaginilor este restricționată.", "Standard image saving is restricted.", "L’enregistrement habituel des images est limité.", "El guardado habitual de imágenes está restringido.")}</li><li>{l("Imaginile afișează identitatea utilizatorului ca watermark.", "Images display the viewer’s identity as a watermark.", "Les images affichent l’identité de l’utilisateur en filigrane.", "Las imágenes muestran la identidad del usuario como marca de agua.")}</li><li>{l("Redirecționarea este permisă numai către alte grupuri protejate.", "Forwarding is limited to other protected groups.", "Le transfert est limité aux autres groupes protégés.", "El reenvío se limita a otros grupos protegidos.")}</li></ul><small>{l("Fotografierea ecranului cu alt dispozitiv nu poate fi împiedicată complet.", "Photographing the screen with another device cannot be completely prevented.", "Photographier l’écran avec un autre appareil ne peut pas être totalement empêché.", "No se puede impedir por completo fotografiar la pantalla con otro dispositivo.")}</small></div>}
     </section></div>}
     {settingsOpen && room && <div className="modalBackdrop" onMouseDown={() => !settingsBusy && setSettingsOpen(false)}><section className="modal manageModal" role="dialog" aria-modal="true" aria-labelledby="group-settings-title" onMouseDown={(e) => e.stopPropagation()}>
       <div className="modalTitle"><div><p className="eyebrow">{l("Grup privat", "Private group")}</p><h2 id="group-settings-title">{l("Setări", "Settings")}</h2></div><button className="iconBtn" aria-label={l("Închide", "Close")} disabled={settingsBusy} onClick={() => setSettingsOpen(false)}>×</button></div>
@@ -1834,6 +1927,10 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
       {isAdmin && <form className="manageSection" onSubmit={addMembers}>
         <label>{l("Adaugă membri", "Add members")}<textarea rows={2} placeholder="user@example.com" value={newMemberEmails} onChange={(e) => setNewMemberEmails(e.target.value)} /></label>
         <p className="helper">{l("Persoanele trebuie să aibă deja cont. Poți separa adresele prin virgulă.", "People must already have an account. Separate addresses with commas.")}</p>
+        <fieldset className="inviteGroups historyChoice"><legend>{l("Ce istoric vor putea vedea?", "What message history can they see?", "Quel historique pourront-ils voir ?", "¿Qué historial podrán ver?")}</legend>
+          <label className="checkLabel"><input type="radio" name="newMemberHistory" value="new" checked={newMemberHistoryAccess === "new"} onChange={() => setNewMemberHistoryAccess("new")} />{l("Numai mesajele trimise după înscriere", "Only messages sent after joining", "Uniquement les messages envoyés après l’inscription", "Solo los mensajes enviados después de unirse")}</label>
+          <label className="checkLabel"><input type="radio" name="newMemberHistory" value="all" checked={newMemberHistoryAccess === "all"} onChange={() => setNewMemberHistoryAccess("all")} />{l("Tot istoricul grupului", "Full group history", "Tout l’historique du groupe", "Todo el historial del grupo")}</label>
+        </fieldset>
         <button className="primary" disabled={settingsBusy || !newMemberEmails.trim()}>{l("Adaugă", "Add")}</button>
       </form>}
       {isAdmin && <form className="manageSection" onSubmit={saveGroupPassword}>
@@ -1864,6 +1961,10 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
           {communityInviteScope === "selected" && <div className="groupChoiceList">{bulkEligibleCommunityRooms.map((item) => <label className="checkLabel" key={item.id}><input type="checkbox" checked={communityInviteGroups.includes(item.id)} onChange={(e) => setCommunityInviteGroups((current) => e.target.checked ? [...current,item.id] : current.filter((id) => id !== item.id))} />{item.title}</label>)}</div>}
           {protectedCommunityRooms.length > 0 && <p className="protectedGroupNote"><span aria-hidden="true">🔒</span>{l(`${protectedCommunityRooms.length} grupuri cu parolă sunt excluse. Membrii se adaugă separat din setările fiecărui grup.`, `${protectedCommunityRooms.length} password-protected groups are excluded. Add members separately from each group's settings.`, `${protectedCommunityRooms.length} groupes protégés par mot de passe sont exclus. Ajoutez les membres séparément dans les paramètres de chaque groupe.`, `${protectedCommunityRooms.length} grupos protegidos con contraseña están excluidos. Añade los miembros por separado desde los ajustes de cada grupo.`)}</p>}
         </fieldset>}
+        {communityInviteScope !== "community" && <fieldset className="inviteGroups historyChoice"><legend>{l("Ce istoric vor putea vedea în grupurile selectate?", "What history can they see in the selected groups?", "Quel historique pourront-ils voir dans les groupes sélectionnés ?", "¿Qué historial podrán ver en los grupos seleccionados?")}</legend>
+          <label className="checkLabel"><input type="radio" name="communityHistory" value="new" checked={communityHistoryAccess === "new"} onChange={() => setCommunityHistoryAccess("new")} />{l("Numai mesajele trimise după înscriere", "Only messages sent after joining", "Uniquement les messages envoyés après l’inscription", "Solo los mensajes enviados después de unirse")}</label>
+          <label className="checkLabel"><input type="radio" name="communityHistory" value="all" checked={communityHistoryAccess === "all"} onChange={() => setCommunityHistoryAccess("all")} />{l("Tot istoricul grupurilor", "Full group history", "Tout l’historique des groupes", "Todo el historial de los grupos")}</label>
+        </fieldset>}
         <p className="helper">{l("Conturile existente sunt adăugate imediat. Pentru celelalte adrese se creează un link valabil 7 zile, pe care îl poți trimite prin WhatsApp sau e-mail.", "Existing accounts are added immediately. For other addresses, a link valid for 7 days is created and can be sent by WhatsApp or email.", "Les comptes existants sont ajoutés immédiatement. Pour les autres adresses, un lien valable 7 jours est créé et peut être envoyé par WhatsApp ou e-mail.", "Las cuentas existentes se añaden inmediatamente. Para las demás direcciones se crea un enlace válido durante 7 días que puedes enviar por WhatsApp o correo electrónico.")}</p>
         <button className="primary" disabled={communityBusy || !communityMemberEmails.trim()}>{l("Adaugă / creează invitațiile", "Add / create invitations", "Ajouter / créer les invitations", "Añadir / crear invitaciones")}</button>
       </form>
@@ -1881,6 +1982,10 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
             return <label className={`checkLabel ${item.password_protected ? "protectedChoice" : ""}`} key={item.conversation_id}><input type="checkbox" checked={memberGroupSelection.includes(item.conversation_id)} disabled={communityBusy || !item.can_manage || fixedAccess} onChange={(e) => setMemberGroupSelection((current) => e.target.checked ? [...current,item.conversation_id] : current.filter((id) => id !== item.conversation_id))} /><span>{item.password_protected ? "🔒 " : ""}{item.title}{fixedAccess ? l(" · acces de administrator", " · administrator access", " · accès administrateur", " · acceso de administrador") : ""}</span></label>;
           })}</div> : <p className="helper">{l("Comunitatea nu are încă nicio clinică/grup.", "This community has no clinics/groups yet.", "Cette communauté ne contient encore aucune clinique ni aucun groupe.", "Esta comunidad todavía no tiene clínicas ni grupos.")}</p>}
           {memberGroupOptions.some((item) => item.password_protected) && <p className="protectedGroupNote"><span aria-hidden="true">🔒</span>{l("Grupurile cu parolă sunt vizibile numai după invitație. Accesul poate fi acordat doar de administratorul grupului sau de administratorul general.", "Password-protected groups are visible only after an invitation. Access can be granted only by the group administrator or the general administrator.", "Les groupes protégés par mot de passe ne sont visibles qu’après une invitation. L’accès ne peut être accordé que par l’administrateur du groupe ou l’administrateur général.", "Los grupos protegidos con contraseña solo son visibles después de una invitación. El acceso solo puede concederlo el administrador del grupo o el administrador general.")}</p>}
+          <fieldset className="inviteGroups historyChoice"><legend>{l("Pentru grupurile adăugate acum", "For groups added now", "Pour les groupes ajoutés maintenant", "Para los grupos añadidos ahora")}</legend>
+            <label className="checkLabel"><input type="radio" name={`memberGroupHistory-${member.user_id}`} value="new" checked={memberGroupHistoryAccess === "new"} onChange={() => setMemberGroupHistoryAccess("new")} />{l("Numai mesajele viitoare", "New messages only", "Nouveaux messages uniquement", "Solo mensajes nuevos")}</label>
+            <label className="checkLabel"><input type="radio" name={`memberGroupHistory-${member.user_id}`} value="all" checked={memberGroupHistoryAccess === "all"} onChange={() => setMemberGroupHistoryAccess("all")} />{l("Tot istoricul", "Full history", "Tout l’historique", "Todo el historial")}</label>
+          </fieldset>
           <div className="memberGroupActions"><button type="button" disabled={communityBusy} onClick={() => { setMemberGroupEditorId(null); setMemberGroupOptions([]); setMemberGroupSelection([]); }}>{t("cancel")}</button><button type="button" className="primary" disabled={communityBusy || !memberGroupOptions.length} onClick={() => saveMemberGroupAccess(member)}>{communityBusy ? t("processing") : t("save")}</button></div>
         </div>}</Fragment>)}</div>
       </div>
