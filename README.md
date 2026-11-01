@@ -6,6 +6,8 @@ Orice membru poate folosi separat **Fixeaza pentru mine**, **Fixeaza pentru toti
 
 Pe telefon si tableta, meniul unui mesaj se deschide prin apasare lunga. Pe Mac si Windows se deschide prin click dreapta sau prin click mentinut. Nu mai apare niciun indicator ori buton peste continut. Meniul afiseaza cinci reactii rapide si butonul **+** pentru lista completa. Vizualizatorul de imagini se inchide prin glisare in jos pe iPhone si Android sau prin comanda Back pe Android, fara buton X.
 
+Pe Mac si Windows, o sageata fina apare numai la trecerea mouse-ului, in exteriorul mesajului si in marginea libera a conversatiilor din lista. Aceasta deschide actiunile fara sa acopere textul sau imaginile. Pe telefon, sagetile raman ascunse, actiunile se deschid prin apasare lunga, iar bifa de citire este afisata compact langa ora.
+
 ## Versiunea v1.19.1
 
 Versiunea v1.19.1 adauga gesturi naturale pe telefon: zoom prin apropierea sau departarea a doua degete, deplasarea imaginii marite prin tragere si deschiderea listei conversatiilor prin glisare din marginea stanga spre dreapta. Grupurile cu mesaje necitite afiseaza numarul imediat dupa titlu, iar titlul este evidentiat cromatic. Actualizarea nu necesita un script SQL nou dupa instalarea v1.19.0.

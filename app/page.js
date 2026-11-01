@@ -40,6 +40,7 @@ function Icon({ name, size = 18 }) {
     trash: <><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13"/><path d="M10 11v5M14 11v5"/></>,
     users: <><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v2"/><path d="M16 4a3 3 0 0 1 0 6M17 13a5 5 0 0 1 4 5v2"/></>,
     menu: <path d="M4 7h16M4 12h16M4 17h16"/>,
+    chevronDown: <path d="m7 9 5 5 5-5"/>,
     close: <path d="m6 6 12 12M18 6 6 18"/>,
   };
   return <svg className="uiIcon" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>;
@@ -395,6 +396,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   const [recentEmojis, setRecentEmojis] = useState([]);
   const [reactionTarget, setReactionTarget] = useState(null);
   const [actionMessage, setActionMessage] = useState(null);
+  const [actionRoom, setActionRoom] = useState(null);
   const [actionReactionsExpanded, setActionReactionsExpanded] = useState(false);
   const [pinnedOpen, setPinnedOpen] = useState(false);
   const [conversationSearchOpen, setConversationSearchOpen] = useState(false);
@@ -514,6 +516,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   }
 
   function chooseRoom(id) {
+    setActionRoom(null);
     setRoomId(id);
     setMobileMenuOpen(false);
   }
@@ -717,13 +720,14 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
       else if (communityModal) setCommunityModal(false);
       else if (emojiOpen) setEmojiOpen(false);
       else if (actionMessage) setActionMessage(null);
+      else if (actionRoom) setActionRoom(null);
       else if (reactionTarget) setReactionTarget(null);
       else if (pinnedOpen) setPinnedOpen(false);
       else if (mobileMenuOpen) setMobileMenuOpen(false);
     }
     document.addEventListener("keydown", closeWithEscape);
     return () => document.removeEventListener("keydown", closeWithEscape);
-  }, [logoutWarning, passwordOpen, passwordBusy, viewerMessage, receiptMessage, forwardMessage, forwardBusy, feedbackOpen, feedbackBusy, settingsOpen, settingsBusy, groupInfoOpen, communitySettingsOpen, communityBusy, profileOpen, profileBusy, modal, communityModal, emojiOpen, actionMessage, reactionTarget, pinnedOpen, mobileMenuOpen]);
+  }, [logoutWarning, passwordOpen, passwordBusy, viewerMessage, receiptMessage, forwardMessage, forwardBusy, feedbackOpen, feedbackBusy, settingsOpen, settingsBusy, groupInfoOpen, communitySettingsOpen, communityBusy, profileOpen, profileBusy, modal, communityModal, emojiOpen, actionMessage, actionRoom, reactionTarget, pinnedOpen, mobileMenuOpen]);
 
   useEffect(() => {
     const previous = previousRoomId.current;
@@ -1193,10 +1197,10 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     setDeletingMessageId(null);
   }
 
-  async function toggleGroupPin() {
-    const { error: pinError } = await supabase.rpc("toggle_conversation_pin", { target_conversation_id: roomId });
+  async function toggleGroupPin(targetRoomId = roomId) {
+    const { error: pinError } = await supabase.rpc("toggle_conversation_pin", { target_conversation_id: targetRoomId });
     if (pinError) setError(pinError.message);
-    else await loadRooms(roomId);
+    else await loadRooms(roomId || targetRoomId);
   }
 
   function scrollToMessage(messageId) {
@@ -1681,16 +1685,20 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
       <nav className="conversationList" aria-label={l("Lista conversațiilor", "Conversation list")}>
         {loading && <p className="status">{t("loading")}</p>}
         {!loading && filteredVisibleRooms.length === 0 && <p className="emptySide">{roomSearch ? l("Niciun grup nu corespunde căutării.", "No groups match your search.") : l("Nu ai conversații în această secțiune.", "You have no conversations in this section.")}</p>}
-        {filteredVisibleRooms.map((item) => <button aria-current={item.id === roomId ? "page" : undefined} className={`conv ${item.id === roomId ? "active" : ""} ${!item.password_protected && item.unread_count > 0 ? "unread" : ""}`} key={item.id} onClick={() => chooseRoom(item.id)}>
-          <span>{item.title.slice(0, 2).toUpperCase()}</span><div><strong className="conversationTitle">{item.is_pinned && <Icon name="pin" size={12}/>}<span>{item.title}</span>{!item.password_protected && item.unread_count > 0 && <i className="unreadBadge">{item.unread_count > 99 ? "99+" : item.unread_count}</i>}</strong><small>{item.member_count} {t("members")} · {item.community_name || t("groupWithoutCommunity")}</small></div>
-        </button>)}
+        {filteredVisibleRooms.map((item) => <div className="conversationEntry" key={item.id}>
+          <button aria-current={item.id === roomId ? "page" : undefined} className={`conv ${item.id === roomId ? "active" : ""} ${!item.password_protected && item.unread_count > 0 ? "unread" : ""}`} onClick={() => chooseRoom(item.id)}>
+            <span>{item.title.slice(0, 2).toUpperCase()}</span><div><strong className="conversationTitle">{item.is_pinned && <Icon name="pin" size={12}/>}<span>{item.title}</span>{!item.password_protected && item.unread_count > 0 && <i className="unreadBadge">{item.unread_count > 99 ? "99+" : item.unread_count}</i>}</strong><small>{item.member_count} {t("members")} · {item.community_name || t("groupWithoutCommunity")}</small></div>
+          </button>
+          <button type="button" className="conversationHoverTrigger" aria-label={l("Acțiuni pentru conversație", "Conversation actions", "Actions de la conversation", "Acciones de la conversación")} aria-expanded={actionRoom?.id === item.id} onClick={() => setActionRoom((current) => current?.id === item.id ? null : item)}><Icon name="chevronDown" size={17}/></button>
+          {actionRoom?.id === item.id && <div className="conversationQuickMenu"><button type="button" onClick={() => chooseRoom(item.id)}>{l("Deschide conversația", "Open conversation", "Ouvrir la conversation", "Abrir conversación")}</button><button type="button" onClick={async () => { setActionRoom(null); await toggleGroupPin(item.id); }}>{item.is_pinned ? l("Scoate pinul", "Unpin", "Désépingler", "Desfijar") : l("Fixează conversația", "Pin conversation", "Épingler la conversation", "Fijar conversación")}</button></div>}
+        </div>)}
       </nav>
       <div className="sideFooter"><button className="profileBtn" onClick={openProfile}><strong>{profileName || session.user.email}</strong><small>{t("profile")} · {isGeneralAdmin ? t("generalAdmin") : t("connected")}</small></button><button className="logoutBtn" onClick={signOut} title={t("logout")}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10" /></svg><span>{t("logout")}</span></button><button className="feedbackBtn" onClick={() => { setFeedbackNotice(""); setFeedbackOpen(true); }}>💬 {l("Feedback", "Feedback", "Avis", "Comentarios")}</button><p className="poweredBy sideCredit">{t("createdBy")}</p></div>
     </aside>
     {mobileMenuOpen && <button className="sideBackdrop" onClick={() => setMobileMenuOpen(false)} aria-label={l("Închide meniul", "Close menu")} />}
     {inviteStatus && <div className="inviteToast" role="status"><span>{inviteStatus}</span><button onClick={() => setInviteStatus("")} aria-label={l("Închide", "Close")}>×</button></div>}
     <section id="conversation-content" tabIndex="-1" aria-label={room ? l(`Conversația ${room.title}`, `${room.title} conversation`, `Conversation ${room.title}`, `Conversación ${room.title}`) : t("yourConversations")} className={`chat ${room ? "" : "chatEmpty"}`} onTouchStart={chatTouchStart} onTouchEnd={chatTouchEnd}>
-      {room ? <><header><button className="mobileMenuBtn iconTextBtn" onClick={() => setMobileMenuOpen(true)} aria-controls="group-menu" aria-expanded={mobileMenuOpen}><Icon name="menu"/><span className="srOnly">{l("Meniu", "Menu")}</span></button><div className="headerMain"><button className="groupInfoButton" onClick={openGroupInfo} title={l("Deschide informațiile grupului", "Open group information", "Ouvrir les informations du groupe", "Abrir la información del grupo")}><strong>{room.title}</strong><small>{room.member_count} {t("members")} · {room.community_name || t("groupWithoutCommunity")} · {room.protected_content ? `🛡 ${l("conținut protejat", "protected content", "contenu protégé", "contenido protegido")}` : l("numai membrii au acces", "members only")}</small></button></div><div className="headerActions"><b>● {l("Privat", "Private")}</b><button className={`iconTextBtn ${conversationSearchOpen ? "active" : ""}`} onClick={() => setConversationSearchOpen((current) => !current)}><Icon name="search" size={16}/>{l("Caută", "Search", "Rechercher", "Buscar")}</button><button className={`iconTextBtn ${pinnedOnly ? "active" : ""}`} onClick={() => setPinnedOnly((current) => !current)}><Icon name="pin" size={16}/>{l("Fixate", "Pinned", "Épinglés", "Fijados")}</button><button className="iconTextBtn" onClick={toggleGroupPin}><Icon name="pin" size={16}/>{room.is_pinned ? l("Fixat", "Pinned") : "Pin"}</button><button className="iconTextBtn" onClick={openSettings}><Icon name="settings" size={16}/>{l("Setări", "Settings")}</button></div></header>
+      {room ? <><header><button className="mobileMenuBtn iconTextBtn" onClick={() => setMobileMenuOpen(true)} aria-controls="group-menu" aria-expanded={mobileMenuOpen}><Icon name="menu"/><span className="srOnly">{l("Meniu", "Menu")}</span></button><div className="headerMain"><button className="groupInfoButton" onClick={openGroupInfo} title={l("Deschide informațiile grupului", "Open group information", "Ouvrir les informations du groupe", "Abrir la información del grupo")}><strong>{room.title}</strong><small>{room.member_count} {t("members")} · {room.community_name || t("groupWithoutCommunity")} · {room.protected_content ? `🛡 ${l("conținut protejat", "protected content", "contenu protégé", "contenido protegido")}` : l("numai membrii au acces", "members only")}</small></button></div><div className="headerActions"><b>● {l("Privat", "Private")}</b><button className={`iconTextBtn ${conversationSearchOpen ? "active" : ""}`} onClick={() => setConversationSearchOpen((current) => !current)}><Icon name="search" size={16}/>{l("Caută", "Search", "Rechercher", "Buscar")}</button><button className={`iconTextBtn ${pinnedOnly ? "active" : ""}`} onClick={() => setPinnedOnly((current) => !current)}><Icon name="pin" size={16}/>{l("Fixate", "Pinned", "Épinglés", "Fijados")}</button><button className="iconTextBtn" onClick={() => toggleGroupPin()}><Icon name="pin" size={16}/>{room.is_pinned ? l("Fixat", "Pinned") : "Pin"}</button><button className="iconTextBtn" onClick={openSettings}><Icon name="settings" size={16}/>{l("Setări", "Settings")}</button></div></header>
         <div className="warning" role="note"><span aria-hidden="true">⚠</span>{t("testWarning")}</div>
         {conversationSearchOpen && <div className="conversationSearchBar"><Icon name="search" size={17}/><input autoFocus value={conversationSearch} onChange={(event) => setConversationSearch(event.target.value)} placeholder={l("Caută mesaje, persoane sau fișiere", "Search messages, people, or files", "Rechercher des messages, personnes ou fichiers", "Buscar mensajes, personas o archivos")} /><button onClick={() => { setConversationSearch(""); setConversationSearchOpen(false); }} aria-label={l("Închide căutarea", "Close search", "Fermer la recherche", "Cerrar búsqueda")}>×</button></div>}
         <div className="msgs" role="log" aria-live="polite" aria-relevant="additions text" aria-label={l("Mesaje", "Messages")}>
@@ -1724,6 +1732,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
                 {item.body && <p><LinkifiedText text={item.body} /></p>}
               </>}<small className="messageMeta">{time(item.created_at, language)} {mine && <button type="button" className={receipt.seen.length ? "readReceipt seen" : "readReceipt"} onClick={() => openReceipts(item)} aria-label={l("Informații de citire", "Read information", "Informations de lecture", "Información de lectura")}>{receipt.seen.length ? "✓✓" : "✓"}</button>}</small>
             </div>
+            {!item.deleted_at && <button type="button" className="messageHoverTrigger" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); setActionMessage(item); }} aria-label={l("Acțiuni pentru mesaj", "Message actions", "Actions du message", "Acciones del mensaje")}><Icon name="chevronDown" size={17}/></button>}
             {!item.deleted_at && Object.keys(itemReactions).length > 0 && <div className="reactionSummary">{Object.entries(itemReactions).map(([emoji, info]) => <button aria-label={l(`${info.count} reacții ${emoji}`, `${info.count} ${emoji} reactions`, `${info.count} réactions ${emoji}`, `${info.count} reacciones ${emoji}`)} className={info.mine ? "mine" : ""} key={emoji} onClick={() => reactToMessage(item.id, emoji)}>{emoji} {info.count}</button>)}</div>}
           </div></Fragment>; })}<div ref={bottom} />
         </div>
@@ -1741,7 +1750,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
           {attachment && <div className="selectedFile"><span>{attachment.name}</span><button type="button" aria-label={l("Elimină atașamentul", "Remove attachment")} onClick={() => { setAttachment(null); if (fileInput.current) fileInput.current.value = ""; }}>×</button></div>}
         </form></div></> :
 	        <><div className="mobileWelcomeBar"><button className="mobileMenuBtn iconTextBtn" onClick={() => setMobileMenuOpen(true)} aria-controls="group-menu" aria-expanded={mobileMenuOpen}><Icon name="menu"/><span>{t("myConversations")}</span></button></div><div className="welcome conversationHome"><div className="logo">eC</div><h2>{selectedCommunity?.name || t("yourConversations")}</h2><p>{visibleRooms.length ? t("chooseConversation") : t("noConversations")}</p>
-	          {visibleRooms.length > 0 && <div className="homeConversationList">{visibleRooms.map((item) => <button className={!item.password_protected && item.unread_count > 0 ? "unread" : ""} key={item.id} onClick={() => chooseRoom(item.id)}><span>{item.title.slice(0,2).toUpperCase()}</span><div><strong className="conversationTitle">{item.is_pinned && <Icon name="pin" size={12}/>}<span>{item.title}</span>{!item.password_protected && item.unread_count > 0 && <i className="unreadBadge">{item.unread_count > 99 ? "99+" : item.unread_count}</i>}</strong><small>{item.member_count} {t("members")} · {item.community_name || t("groupWithoutCommunity")}</small></div></button>)}</div>}
+	          {visibleRooms.length > 0 && <div className="homeConversationList">{visibleRooms.map((item) => <div className="conversationEntry homeConversationEntry" key={item.id}><button className={`homeConversationButton ${!item.password_protected && item.unread_count > 0 ? "unread" : ""}`} onClick={() => chooseRoom(item.id)}><span>{item.title.slice(0,2).toUpperCase()}</span><div><strong className="conversationTitle">{item.is_pinned && <Icon name="pin" size={12}/>}<span>{item.title}</span>{!item.password_protected && item.unread_count > 0 && <i className="unreadBadge">{item.unread_count > 99 ? "99+" : item.unread_count}</i>}</strong><small>{item.member_count} {t("members")} · {item.community_name || t("groupWithoutCommunity")}</small></div></button><button type="button" className="conversationHoverTrigger" aria-label={l("Acțiuni pentru conversație", "Conversation actions", "Actions de la conversation", "Acciones de la conversación")} aria-expanded={actionRoom?.id === item.id} onClick={() => setActionRoom((current) => current?.id === item.id ? null : item)}><Icon name="chevronDown" size={17}/></button>{actionRoom?.id === item.id && <div className="conversationQuickMenu"><button type="button" onClick={() => chooseRoom(item.id)}>{l("Deschide conversația", "Open conversation", "Ouvrir la conversation", "Abrir conversación")}</button><button type="button" onClick={async () => { setActionRoom(null); await toggleGroupPin(item.id); }}>{item.is_pinned ? l("Scoate pinul", "Unpin", "Désépingler", "Desfijar") : l("Fixează conversația", "Pin conversation", "Épingler la conversation", "Fijar conversación")}</button></div>}</div>)}</div>}
 	          {!visibleRooms.length && canCreateGroup && <button className="primary" onClick={() => setModal(true)}>{t("firstGroup")}</button>}{error && <p className="chatError" role="alert">{error}</p>}</div></>}
     </section>
     {viewerMessage && imageUrls[viewerMessage.attachment_path] && <div className="mediaViewerBackdrop" onMouseDown={closeImageViewer}><section className="mediaViewer" style={{ transform: `translateY(${viewerDismissY}px)`, opacity: Math.max(.35,1-viewerDismissY/500) }} role="dialog" aria-modal="true" aria-label={l("Vizualizator imagine", "Image viewer", "Visionneuse d’image", "Visor de imágenes")} onMouseDown={(event) => event.stopPropagation()}>
