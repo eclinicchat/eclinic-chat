@@ -1,4 +1,12 @@
-# eClinTalk v1.17.3
+# eClinTalk v1.18.0
+
+Versiunea v1.18.0 adauga o fereastra clara cu informatiile grupului: membri, imagini, fisiere si linkuri partajate. Mesajele accepta acum, pe langa imagini, documente PDF, Word, Excel si fisiere text de maximum 20 MB.
+
+Administratorii pot activa separat pentru fiecare grup optiunea **Continut protejat**. Imaginile protejate sunt afisate cu un watermark care identifica utilizatorul, nu au deschidere directa pentru descarcare si folosesc linkuri temporare de 5 minute. Aceasta protectie reduce salvarile accidentale sau neautorizate, dar nu poate impiedica in totalitate capturile de ecran ori fotografierea ecranului cu alt dispozitiv.
+
+Inainte de publicarea acestei versiuni, ruleaza integral o singura data `supabase-group-content-v1.18.sql` in Supabase SQL Editor.
+
+## Versiunea v1.17.3
 
 Versiunea v1.17.3 corecteaza meniul lateral in ecranul initial si in conversatii. Lista grupurilor poate fi derulata independent, iar zona de profil si butonul **Iesire / Sign out** raman accesibile la baza ecranului pe Mac, Windows, iPhone/iPad si Android, inclusiv pe ecrane cu inaltime redusa. Actualizarea nu necesita niciun script SQL nou.
 

@@ -7,6 +7,7 @@ import { EXTRA_TRANSLATIONS } from "./i18n-extra";
 const LANGUAGE_LOCALES = { ro: "ro-RO", en: "en-GB", fr: "fr-FR", es: "es-ES" };
 const SUPPORTED_LANGUAGES = Object.keys(LANGUAGE_LOCALES);
 const time = (value, language = "ro") => new Date(value).toLocaleTimeString(LANGUAGE_LOCALES[language] || LANGUAGE_LOCALES.ro, { hour: "2-digit", minute: "2-digit" });
+const linksFromText = (value = "") => (value.match(/https?:\/\/[^\s<>"']+/gi) || []).map((url) => url.replace(/[),.;!?]+$/, ""));
 const localize = (language, ro, en, fr, es) => {
   if (language === "ro") return ro;
   if (language === "fr") return fr || EXTRA_TRANSLATIONS.fr?.[en] || en;
@@ -397,6 +398,8 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   const [error, setError] = useState("");
   const [modal, setModal] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [groupInfoOpen, setGroupInfoOpen] = useState(false);
+  const [groupInfoTab, setGroupInfoTab] = useState("members");
   const [members, setMembers] = useState([]);
   const [settingsTitle, setSettingsTitle] = useState("");
   const [newMemberEmails, setNewMemberEmails] = useState("");
@@ -408,6 +411,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   const [passwordError, setPasswordError] = useState("");
   const [groupPassword, setGroupPassword] = useState("");
   const [passwordProtected, setPasswordProtected] = useState(false);
+  const [protectedContent, setProtectedContent] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [mentionsOnly, setMentionsOnly] = useState(false);
@@ -449,6 +453,10 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
   const isAdmin = Boolean(isOwner || currentMembership?.is_admin);
   const pinnedMessages = messages.filter((x) => x.pinned_at).sort((a, b) => new Date(b.pinned_at) - new Date(a.pinned_at));
   const displayNameForUser = (userId, fallback) => members.find((member) => member.user_id === userId)?.display_name || fallback || l("Utilizator", "User");
+  const sharedMedia = messages.filter((item) => !item.deleted_at && item.attachment_path && (item.attachment_type || "").startsWith("image/"));
+  const sharedFiles = messages.filter((item) => !item.deleted_at && item.attachment_path && !(item.attachment_type || "").startsWith("image/"));
+  const sharedLinks = messages.flatMap((item) => linksFromText(item.deleted_at ? "" : item.body || "").map((url) => ({ url, messageId: item.id, createdAt: item.created_at, sender: displayNameForUser(item.user_id, item.sender_email) })));
+  const protectedWatermark = `${profileName || session.user.email || "eClinTalk"} · ${new Date().toLocaleDateString(LANGUAGE_LOCALES[language] || LANGUAGE_LOCALES.ro)}`;
   const mentionMatch = draft.match(/(?:^|\s)@([^\s@]*)$/);
   const mentionQuery = (mentionMatch?.[1] || "").toLocaleLowerCase();
   const mentionSuggestions = mentionMatch ? members
@@ -537,6 +545,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
       if (event.key !== "Escape" || logoutWarning) return;
       if (passwordOpen && !passwordBusy) cancelPassword();
       else if (settingsOpen && !settingsBusy) setSettingsOpen(false);
+      else if (groupInfoOpen) setGroupInfoOpen(false);
       else if (communitySettingsOpen && !communityBusy) setCommunitySettingsOpen(false);
       else if (profileOpen && !profileBusy) setProfileOpen(false);
       else if (modal) setModal(false);
@@ -548,7 +557,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     }
     document.addEventListener("keydown", closeWithEscape);
     return () => document.removeEventListener("keydown", closeWithEscape);
-  }, [logoutWarning, passwordOpen, passwordBusy, settingsOpen, settingsBusy, communitySettingsOpen, communityBusy, profileOpen, profileBusy, modal, communityModal, emojiOpen, reactionTarget, pinnedOpen, mobileMenuOpen]);
+  }, [logoutWarning, passwordOpen, passwordBusy, settingsOpen, settingsBusy, groupInfoOpen, communitySettingsOpen, communityBusy, profileOpen, profileBusy, modal, communityModal, emojiOpen, reactionTarget, pinnedOpen, mobileMenuOpen]);
 
   useEffect(() => {
     const previous = previousRoomId.current;
@@ -737,20 +746,20 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     const paths = messages.map((item) => item.attachment_path).filter((path) => path && !imageUrls[path]);
     if (!paths.length) return;
     Promise.all(paths.map(async (path) => {
-      const { data } = await supabase.storage.from("chat-images").createSignedUrl(path, 60 * 60);
+      const { data } = await supabase.storage.from("chat-images").createSignedUrl(path, room?.protected_content ? 5 * 60 : 60 * 60);
       return [path, data?.signedUrl || ""];
     })).then((entries) => {
       if (active) setImageUrls((current) => ({ ...current, ...Object.fromEntries(entries) }));
     });
     return () => { active = false; };
-  }, [messages, imageUrls]);
+  }, [messages, imageUrls, room?.protected_content]);
 
   function chooseFile(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const allowed = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
-    if (!allowed.includes(file.type)) { setError(l("Poți atașa numai imagini JPG, PNG, WEBP sau HEIC.", "You can only attach JPG, PNG, WEBP, or HEIC images.")); e.target.value = ""; return; }
-    if (file.size > 10 * 1024 * 1024) { setError(l("Imaginea trebuie să aibă cel mult 10 MB.", "The image must be no larger than 10 MB.")); e.target.value = ""; return; }
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "text/plain"];
+    if (!allowed.includes(file.type)) { setError(l("Poți atașa imagini, PDF, Word, Excel sau fișiere text.", "You can attach images, PDF, Word, Excel, or text files.", "Vous pouvez joindre des images, des fichiers PDF, Word, Excel ou texte.", "Puedes adjuntar imágenes, PDF, Word, Excel o archivos de texto.")); e.target.value = ""; return; }
+    if (file.size > 20 * 1024 * 1024) { setError(l("Fișierul trebuie să aibă cel mult 20 MB.", "The file must be no larger than 20 MB.", "Le fichier ne doit pas dépasser 20 Mo.", "El archivo no debe superar los 20 MB.")); e.target.value = ""; return; }
     setError("");
     setAttachment(file);
   }
@@ -766,7 +775,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
       const extension = attachment.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
       uploadedPath = `${roomId}/${session.user.id}/${crypto.randomUUID()}.${extension}`;
       const { error: uploadError } = await supabase.storage.from("chat-images").upload(uploadedPath, attachment, { contentType: attachment.type, upsert: false });
-      if (uploadError) { setError(l("Imaginea nu a putut fi încărcată.", "The image could not be uploaded.")); setSending(false); return; }
+      if (uploadError) { setError(l("Fișierul nu a putut fi încărcat.", "The file could not be uploaded.", "Le fichier n’a pas pu être téléversé.", "No se pudo cargar el archivo.")); setSending(false); return; }
       attachmentData = { attachment_path: uploadedPath, attachment_name: attachment.name, attachment_type: attachment.type, attachment_size: attachment.size };
     }
     const activeMentionIds = selectedMentions
@@ -846,7 +855,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     if (item.attachment_path) {
       const { error: imageDeleteError } = await supabase.storage.from("chat-images").remove([item.attachment_path]);
       if (imageDeleteError) {
-        setError(l("Imaginea nu a putut fi ștearsă. Mesajul a fost păstrat.", "The image could not be deleted. The message was kept."));
+        setError(l("Fișierul nu a putut fi șters. Mesajul a fost păstrat.", "The file could not be deleted. The message was kept.", "Le fichier n’a pas pu être supprimé. Le message a été conservé.", "No se pudo eliminar el archivo. El mensaje se conservó."));
         setDeletingMessageId(null);
         return;
       }
@@ -1115,6 +1124,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     setSettingsTitle(room?.title || "");
     setNewMemberEmails("");
     setGroupPassword("");
+    setProtectedContent(Boolean(room?.protected_content));
     setMembers([]);
     const [, passwordResult] = await Promise.all([
       loadMembers(),
@@ -1134,6 +1144,28 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
       setMentionsOnly(preference?.mentions_only ?? false);
       setMutedUntil(preference?.muted_until || "");
     }
+  }
+
+  async function openGroupInfo() {
+    setGroupInfoTab("members");
+    setGroupInfoOpen(true);
+    await loadMembers();
+  }
+
+  async function saveProtectedContent(e) {
+    e.preventDefault();
+    if (!roomId || settingsBusy) return;
+    setSettingsBusy(true); setSettingsError("");
+    const { error: protectionError } = await supabase.rpc("set_conversation_protected_content", {
+      target_conversation_id: roomId,
+      enabled: protectedContent,
+    });
+    if (protectionError) setSettingsError(protectionError.message);
+    else {
+      setImageUrls({});
+      await loadRooms(roomId);
+    }
+    setSettingsBusy(false);
   }
 
   async function saveNotificationPreferences(e) {
@@ -1361,7 +1393,7 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     {mobileMenuOpen && <button className="sideBackdrop" onClick={() => setMobileMenuOpen(false)} aria-label={l("Închide meniul", "Close menu")} />}
     {inviteStatus && <div className="inviteToast" role="status"><span>{inviteStatus}</span><button onClick={() => setInviteStatus("")} aria-label={l("Închide", "Close")}>×</button></div>}
     <section id="conversation-content" tabIndex="-1" aria-label={room ? l(`Conversația ${room.title}`, `${room.title} conversation`, `Conversation ${room.title}`, `Conversación ${room.title}`) : t("yourConversations")} className={`chat ${room ? "" : "chatEmpty"}`}>
-      {room ? <><header><button className="mobileMenuBtn iconTextBtn" onClick={() => setMobileMenuOpen(true)} aria-controls="group-menu" aria-expanded={mobileMenuOpen}><Icon name="menu"/><span className="srOnly">{l("Meniu", "Menu")}</span></button><div className="headerMain"><strong>{room.title}</strong><small>{room.member_count} {t("members")} · {room.community_name || t("groupWithoutCommunity")} · {l("numai membrii au acces", "members only")}</small></div><div className="headerActions"><b>● {l("Privat", "Private")}</b><button className="iconTextBtn" onClick={toggleGroupPin}><Icon name="pin" size={16}/>{room.is_pinned ? l("Fixat", "Pinned") : "Pin"}</button><button className="iconTextBtn" onClick={openSettings}><Icon name="settings" size={16}/>{l("Setări", "Settings")}</button></div></header>
+      {room ? <><header><button className="mobileMenuBtn iconTextBtn" onClick={() => setMobileMenuOpen(true)} aria-controls="group-menu" aria-expanded={mobileMenuOpen}><Icon name="menu"/><span className="srOnly">{l("Meniu", "Menu")}</span></button><div className="headerMain"><button className="groupInfoButton" onClick={openGroupInfo} title={l("Deschide informațiile grupului", "Open group information", "Ouvrir les informations du groupe", "Abrir la información del grupo")}><strong>{room.title}</strong><small>{room.member_count} {t("members")} · {room.community_name || t("groupWithoutCommunity")} · {room.protected_content ? `🛡 ${l("conținut protejat", "protected content", "contenu protégé", "contenido protegido")}` : l("numai membrii au acces", "members only")}</small></button></div><div className="headerActions"><b>● {l("Privat", "Private")}</b><button className="iconTextBtn" onClick={toggleGroupPin}><Icon name="pin" size={16}/>{room.is_pinned ? l("Fixat", "Pinned") : "Pin"}</button><button className="iconTextBtn" onClick={openSettings}><Icon name="settings" size={16}/>{l("Setări", "Settings")}</button></div></header>
         <div className="warning" role="note"><span aria-hidden="true">⚠</span>{t("testWarning")}</div>
         <div className="msgs" role="log" aria-live="polite" aria-relevant="additions text" aria-label={l("Mesaje", "Messages")}>
           {pinnedMessages.length > 0 && <div className="pinnedArea">
@@ -1384,11 +1416,11 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
                 {!mine && <strong className="sender">{displayNameForUser(item.user_id, item.sender_email)}</strong>}
                 {item.pinned_at && <span className="pinMark"><Icon name="pin" size={14}/></span>}
                 {item.reply_to_id && <button className="replyQuote" onClick={() => scrollToMessage(item.reply_to_id)}>
-                  <strong>{replied ? displayNameForUser(replied.user_id, replied.sender_email) : l("Mesaj anterior", "Previous message")}</strong><span>{replied?.deleted_at ? l("Mesaj șters", "Deleted message") : replied?.body || (replied?.attachment_path ? l("📷 Imagine", "📷 Image") : l("Mesaj indisponibil", "Message unavailable"))}</span>
-                  {!replied?.deleted_at && replied?.attachment_path && imageUrls[replied.attachment_path] && <img src={imageUrls[replied.attachment_path]} alt={l("Imagine citată", "Quoted image")} />}
+                  <strong>{replied ? displayNameForUser(replied.user_id, replied.sender_email) : l("Mesaj anterior", "Previous message")}</strong><span>{replied?.deleted_at ? l("Mesaj șters", "Deleted message") : replied?.body || replied?.attachment_name || (replied?.attachment_path ? l("Fișier atașat", "Attached file", "Fichier joint", "Archivo adjunto") : l("Mesaj indisponibil", "Message unavailable"))}</span>
+                  {!replied?.deleted_at && replied?.attachment_path && (replied.attachment_type || "").startsWith("image/") && imageUrls[replied.attachment_path] && <img draggable={room.protected_content ? false : undefined} src={imageUrls[replied.attachment_path]} alt={l("Imagine citată", "Quoted image")} />}
                 </button>}
-                {item.attachment_path && imageUrls[item.attachment_path] && <a href={imageUrls[item.attachment_path]} target="_blank" rel="noreferrer"><img className="chatImage" src={imageUrls[item.attachment_path]} alt={item.attachment_name || l("Imagine atașată", "Attached image")} /></a>}
-                {item.attachment_path && !imageUrls[item.attachment_path] && <p className="imageLoading">{l("Se încarcă imaginea...", "Loading image...")}</p>}
+                {item.attachment_path && imageUrls[item.attachment_path] && ((item.attachment_type || "").startsWith("image/") ? (room.protected_content ? <div className="protectedMedia" onContextMenu={(e) => e.preventDefault()}><img draggable="false" className="chatImage" src={imageUrls[item.attachment_path]} alt={item.attachment_name || l("Imagine atașată", "Attached image")} /><span className="mediaWatermark" aria-hidden="true">{protectedWatermark}</span></div> : <a href={imageUrls[item.attachment_path]} target="_blank" rel="noreferrer"><img className="chatImage" src={imageUrls[item.attachment_path]} alt={item.attachment_name || l("Imagine atașată", "Attached image")} /></a>) : <a className="fileAttachment" href={imageUrls[item.attachment_path]} target="_blank" rel="noreferrer" onContextMenu={room.protected_content ? (e) => e.preventDefault() : undefined}><span aria-hidden="true">📄</span><span><strong>{item.attachment_name || l("Fișier atașat", "Attached file")}</strong><small>{item.attachment_size ? `${Math.max(1, Math.round(item.attachment_size / 1024))} KB` : l("Deschide fișierul", "Open file")}</small></span></a>)}
+                {item.attachment_path && !imageUrls[item.attachment_path] && <p className="imageLoading">{l("Se încarcă fișierul...", "Loading file...", "Chargement du fichier…", "Cargando archivo…")}</p>}
                 {item.body && <p><LinkifiedText text={item.body} /></p>}
               </>}<small>{time(item.created_at, language)}</small>
             </div>
@@ -1400,9 +1432,9 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
           </div></Fragment>; })}<div ref={bottom} />
         </div>
         <div>{error && <p className="chatError" role="alert">{error}</p>}<form className="composer" onSubmit={send} aria-label={l("Scrie un mesaj", "Write a message")}>
-	          {replyTo && <div className="selectedReply"><div><strong>{l("Răspuns către", "Reply to")} {displayNameForUser(replyTo.user_id, replyTo.sender_email)}</strong><span>{replyTo.body || (replyTo.attachment_path ? l("📷 Imagine", "📷 Image") : l("Mesaj", "Message"))}</span></div>{replyTo.attachment_path && imageUrls[replyTo.attachment_path] && <img src={imageUrls[replyTo.attachment_path]} alt={l("Imagine selectată pentru răspuns", "Image selected for reply")} />}<button type="button" onClick={() => setReplyTo(null)} aria-label={l("Anulează răspunsul", "Cancel reply")}>×</button></div>}
-          <input ref={fileInput} className="fileInput" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" onChange={chooseFile} />
-          <button className="attachBtn" type="button" onClick={() => fileInput.current?.click()} disabled={sending} title={l("Atașează imagine", "Attach image")} aria-label={l("Atașează imagine", "Attach image")}><Icon name="attachment" size={20}/></button>
+	          {replyTo && <div className="selectedReply"><div><strong>{l("Răspuns către", "Reply to")} {displayNameForUser(replyTo.user_id, replyTo.sender_email)}</strong><span>{replyTo.body || replyTo.attachment_name || (replyTo.attachment_path ? l("Fișier atașat", "Attached file", "Fichier joint", "Archivo adjunto") : l("Mesaj", "Message"))}</span></div>{replyTo.attachment_path && (replyTo.attachment_type || "").startsWith("image/") && imageUrls[replyTo.attachment_path] && <img draggable={room.protected_content ? false : undefined} src={imageUrls[replyTo.attachment_path]} alt={l("Imagine selectată pentru răspuns", "Image selected for reply")} />}<button type="button" onClick={() => setReplyTo(null)} aria-label={l("Anulează răspunsul", "Cancel reply")}>×</button></div>}
+          <input ref={fileInput} className="fileInput" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf,.doc,.docx,.xls,.xlsx,.txt" onChange={chooseFile} />
+          <button className="attachBtn" type="button" onClick={() => fileInput.current?.click()} disabled={sending} title={l("Atașează imagine sau fișier", "Attach image or file", "Joindre une image ou un fichier", "Adjuntar imagen o archivo")} aria-label={l("Atașează imagine sau fișier", "Attach image or file", "Joindre une image ou un fichier", "Adjuntar imagen o archivo")}><Icon name="attachment" size={20}/></button>
           <button className={`emojiBtn ${emojiOpen ? "active" : ""}`} type="button" onClick={() => setEmojiOpen(!emojiOpen)} disabled={sending} title={l("Emoticoane", "Emoji")} aria-label={l("Emoticoane", "Emoji")}><Icon name="smile" size={20}/></button>
 	          <input ref={messageInput} aria-label={l("Mesaj", "Message")} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={t("messagePlaceholder")} maxLength={4000} disabled={sending} autoComplete="off" />
 	          <button className="primary sendBtn iconTextBtn" disabled={sending || (!draft.trim() && !attachment)}><Icon name="send" size={17}/><span>{sending ? t("sending") : t("send")}</span></button>
@@ -1418,10 +1450,33 @@ function Chat({ session, language, setLanguage, themePreference, setThemePrefere
     </section>
     {modal && <NewConversation language={language} close={() => setModal(false)} communities={communities} selectedCommunityId={selectedCommunityId} isGeneralAdmin={isGeneralAdmin} created={(id) => { setModal(false); loadRooms(id); loadCommunities(); }} />}
     {communityModal && <NewCommunity language={language} close={() => setCommunityModal(false)} created={(id) => { setCommunityModal(false); loadCommunities(id); }} />}
+    {groupInfoOpen && room && <div className="modalBackdrop" onMouseDown={() => setGroupInfoOpen(false)}><section className="modal manageModal groupInfoModal" role="dialog" aria-modal="true" aria-labelledby="group-info-title" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="modalTitle"><div><p className="eyebrow">{room.community_name || l("Grup independent", "Independent group", "Groupe indépendant", "Grupo independiente")}</p><h2 id="group-info-title">{room.title}</h2></div><button className="iconBtn" aria-label={l("Închide", "Close", "Fermer", "Cerrar")} onClick={() => setGroupInfoOpen(false)}>×</button></div>
+      <div className="groupInfoSummary"><span>{room.member_count} {t("members")}</span><span>{room.password_protected ? `🔒 ${l("Parolă activă", "Password enabled", "Mot de passe activé", "Contraseña activa")}` : `✓ ${l("Numai pentru membri", "Members only", "Membres uniquement", "Solo miembros")}`}</span>{room.protected_content && <span>🛡 {l("Conținut protejat", "Protected content", "Contenu protégé", "Contenido protegido")}</span>}</div>
+      <div className="groupInfoTabs" role="tablist">
+        <button type="button" role="tab" aria-selected={groupInfoTab === "members"} className={groupInfoTab === "members" ? "active" : ""} onClick={() => setGroupInfoTab("members")}>{l("Membri", "Members", "Membres", "Miembros")} <small>{members.length}</small></button>
+        <button type="button" role="tab" aria-selected={groupInfoTab === "media"} className={groupInfoTab === "media" ? "active" : ""} onClick={() => setGroupInfoTab("media")}>{l("Media", "Media", "Médias", "Multimedia")} <small>{sharedMedia.length}</small></button>
+        <button type="button" role="tab" aria-selected={groupInfoTab === "files"} className={groupInfoTab === "files" ? "active" : ""} onClick={() => setGroupInfoTab("files")}>{l("Fișiere", "Files", "Fichiers", "Archivos")} <small>{sharedFiles.length}</small></button>
+        <button type="button" role="tab" aria-selected={groupInfoTab === "links"} className={groupInfoTab === "links" ? "active" : ""} onClick={() => setGroupInfoTab("links")}>{l("Linkuri", "Links", "Liens", "Enlaces")} <small>{sharedLinks.length}</small></button>
+      </div>
+      <div className="groupInfoContent" role="tabpanel">
+        {groupInfoTab === "members" && <div className="memberList">{members.map((member) => <div className="memberRow groupMemberInfo" key={member.user_id}><span className="memberAvatar">{(member.display_name || member.email).slice(0,2).toUpperCase()}</span><div><strong>{member.display_name || member.email}</strong><small>{member.email} · {member.is_owner ? l("Proprietar · Administrator", "Owner · Administrator", "Propriétaire · Administrateur", "Propietario · Administrador") : member.is_admin ? "Administrator" : l("Membru", "Member", "Membre", "Miembro")}</small></div></div>)}</div>}
+        {groupInfoTab === "media" && (sharedMedia.length ? <div className="mediaGallery">{sharedMedia.map((item) => imageUrls[item.attachment_path] && (room.protected_content ? <div className="protectedMedia galleryMedia" key={item.id} onContextMenu={(e) => e.preventDefault()}><img draggable="false" src={imageUrls[item.attachment_path]} alt={item.attachment_name || l("Imagine", "Image")} /><span className="mediaWatermark" aria-hidden="true">{protectedWatermark}</span></div> : <a className="galleryMedia" href={imageUrls[item.attachment_path]} target="_blank" rel="noreferrer" key={item.id}><img src={imageUrls[item.attachment_path]} alt={item.attachment_name || l("Imagine", "Image")} /></a>))}</div> : <p className="emptyInfo">{l("Nu au fost trimise imagini în acest grup.", "No images have been shared in this group.", "Aucune image n’a été partagée dans ce groupe.", "No se han compartido imágenes en este grupo.")}</p>)}
+        {groupInfoTab === "files" && (sharedFiles.length ? <div className="sharedItemList">{sharedFiles.map((item) => <a href={imageUrls[item.attachment_path] || "#"} target="_blank" rel="noreferrer" className="sharedFileRow" key={item.id}><span aria-hidden="true">📄</span><span><strong>{item.attachment_name || l("Fișier", "File")}</strong><small>{displayNameForUser(item.user_id,item.sender_email)} · {new Date(item.created_at).toLocaleDateString(LANGUAGE_LOCALES[language])}</small></span></a>)}</div> : <p className="emptyInfo">{l("Nu au fost trimise fișiere în acest grup.", "No files have been shared in this group.", "Aucun fichier n’a été partagé dans ce groupe.", "No se han compartido archivos en este grupo.")}</p>)}
+        {groupInfoTab === "links" && (sharedLinks.length ? <div className="sharedItemList">{sharedLinks.map((item,index) => <a href={item.url} target="_blank" rel="noreferrer" className="sharedLinkRow" key={`${item.messageId}-${index}`}><span aria-hidden="true">🔗</span><span><strong>{item.url}</strong><small>{item.sender} · {new Date(item.createdAt).toLocaleDateString(LANGUAGE_LOCALES[language])}</small></span></a>)}</div> : <p className="emptyInfo">{l("Nu au fost trimise linkuri în acest grup.", "No links have been shared in this group.", "Aucun lien n’a été partagé dans ce groupe.", "No se han compartido enlaces en este grupo.")}</p>)}
+      </div>
+      {room.protected_content && <p className="protectedContentNotice">🛡 {l("Salvarea obișnuită a imaginilor este restricționată, iar imaginile sunt marcate cu identitatea utilizatorului. Capturile realizate cu alt dispozitiv nu pot fi împiedicate complet.", "Standard image saving is restricted and images are marked with the viewer’s identity. Captures made with another device cannot be completely prevented.", "L’enregistrement habituel des images est limité et les images portent l’identité de l’utilisateur. Une capture réalisée avec un autre appareil ne peut pas être totalement empêchée.", "El guardado habitual de imágenes está restringido y las imágenes llevan la identidad del usuario. No se puede impedir por completo una captura realizada con otro dispositivo.")}</p>}
+    </section></div>}
     {settingsOpen && room && <div className="modalBackdrop" onMouseDown={() => !settingsBusy && setSettingsOpen(false)}><section className="modal manageModal" role="dialog" aria-modal="true" aria-labelledby="group-settings-title" onMouseDown={(e) => e.stopPropagation()}>
       <div className="modalTitle"><div><p className="eyebrow">{l("Grup privat", "Private group")}</p><h2 id="group-settings-title">{l("Setări", "Settings")}</h2></div><button className="iconBtn" aria-label={l("Închide", "Close")} disabled={settingsBusy} onClick={() => setSettingsOpen(false)}>×</button></div>
       {isAdmin && <form className="manageSection" onSubmit={renameConversation}>
         <label>{l("Numele grupului", "Group name")}<div className="inlineForm"><input required maxLength={80} value={settingsTitle} onChange={(e) => setSettingsTitle(e.target.value)} /><button className="primary" disabled={settingsBusy || !settingsTitle.trim()}>{t("save")}</button></div></label>
+      </form>}
+      {isAdmin && <form className="manageSection" onSubmit={saveProtectedContent}>
+        <div className="sectionHeading"><strong>{l("Protecția conținutului", "Content protection", "Protection du contenu", "Protección del contenido")}</strong><small>{protectedContent ? l("Activă", "Active", "Active", "Activa") : l("Inactivă", "Inactive", "Inactive", "Inactiva")}</small></div>
+        <label className="checkLabel"><input type="checkbox" checked={protectedContent} onChange={(e) => setProtectedContent(e.target.checked)} />{l("Restricționează salvarea imaginilor din acest grup", "Restrict saving images from this group", "Limiter l’enregistrement des images de ce groupe", "Restringir el guardado de imágenes de este grupo")}</label>
+        <p className="helper">{l("Imaginile primesc watermark cu identitatea utilizatorului, nu pot fi deschise direct pentru descărcare și folosesc linkuri temporare de 5 minute. Protecția nu poate împiedica fotografierea ecranului cu alt dispozitiv.", "Images receive a watermark with the viewer’s identity, cannot be opened directly for download, and use 5-minute temporary links. This cannot prevent someone photographing the screen with another device.", "Les images reçoivent un filigrane avec l’identité de l’utilisateur, ne peuvent pas être ouvertes directement pour être téléchargées et utilisent des liens temporaires de 5 minutes. Cela ne peut pas empêcher de photographier l’écran avec un autre appareil.", "Las imágenes reciben una marca de agua con la identidad del usuario, no pueden abrirse directamente para descargarlas y usan enlaces temporales de 5 minutos. Esto no impide fotografiar la pantalla con otro dispositivo.")}</p>
+        <button className="primary" disabled={settingsBusy}>{settingsBusy ? l("Se salvează...", "Saving...", "Enregistrement…", "Guardando…") : t("save")}</button>
       </form>}
       <form className="manageSection" onSubmit={saveNotificationPreferences}>
         <div className="sectionHeading"><strong>{l("Notificări", "Notifications")}</strong><small>{l("Numai pentru contul tău", "Only for your account")}</small></div>
